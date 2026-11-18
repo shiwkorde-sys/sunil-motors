@@ -39,7 +39,15 @@ const tokens = (s: string) =>
     .filter((t) => t && !STOP.has(t));
 
 const vehicleHay = (p: Part) => [p.company, ...p.compatible_models].join(' ').toLowerCase();
-const partHay = (p: Part) => [p.name, p.category, p.sku, p.description].join(' ').toLowerCase();
+const partHay = (p: Part) => [p.name, p.category, p.sku].join(' ').toLowerCase(); // manual Part box: name, type, SKU only
+const fullHay = (p: Part) => partHay(p) + ' ' + (p.description ?? '').toLowerCase(); // voice/photo text may also match the description
+
+/** Word match that forgives endings: "brake" also finds "braking", "belts" finds "belt". */
+const has = (hay: string, t: string) => {
+  if (hay.includes(t)) return true;
+  const stem = t.replace(/(ing|es|e|s)$/, '');
+  return stem.length >= 4 && stem !== t && hay.includes(stem);
+};
 
 /** Every typed word must match (manual boxes). Free text from voice/camera is more forgiving. */
 export function searchParts(parts: Part[], q: Query): Part[] {
@@ -53,11 +61,11 @@ export function searchParts(parts: Part[], q: Query): Part[] {
     const vh = vehicleHay(p);
     const ph = partHay(p);
     if (!v.every((t) => vh.includes(t))) continue;
-    if (!n.every((t) => ph.includes(t))) continue;
+    if (!n.every((t) => has(ph, t))) continue;
     let score = 0;
     if (a.length) {
-      const all = vh + ' ' + ph;
-      const hit = a.filter((t) => all.includes(t)).length;
+      const all = vh + ' ' + fullHay(p);
+      const hit = a.filter((t) => has(all, t)).length;
       if (hit < Math.max(1, Math.ceil(a.length * 0.6))) continue;
       score = hit;
     }

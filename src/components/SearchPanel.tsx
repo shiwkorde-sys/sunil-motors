@@ -5,6 +5,7 @@ import { useVoiceSearch } from '../lib/speech';
 import { photoToBase64 } from '../lib/image';
 import { supabase } from '../lib/supabase';
 import type { Part } from '../lib/types';
+import { CameraIcon, MicIcon } from './icons';
 import { inputCls } from './ui';
 
 interface Props {
@@ -48,11 +49,11 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
 
   const btn = 'flex items-center justify-center gap-2 rounded-2xl font-bold text-white shadow transition active:scale-95 disabled:opacity-60';
   const size = large ? 'h-24 flex-col text-xl' : 'h-12 px-5 text-base';
-  const icon = large ? 'text-4xl' : 'text-xl';
+  const icon = large ? 'h-9 w-9' : 'h-5 w-5';
 
   const camera = (
     <button onClick={() => fileRef.current?.click()} disabled={camBusy} className={`${btn} ${size} bg-brand`} aria-label="Search by camera">
-      <span className={icon}>📷</span>
+      <CameraIcon className={icon} />
       {camBusy ? 'Looking…' : 'Camera'}
     </button>
   );
@@ -62,7 +63,7 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
       className={`${btn} ${size} ${voice.listening ? 'animate-pulse bg-green-600' : 'bg-slate-800'}`}
       aria-label="Search by voice"
     >
-      <span className={icon}>🎤</span>
+      <MicIcon className={icon} />
       {voice.listening ? (lang === 'hi' ? 'बोलिए…' : 'Listening…') : lang === 'hi' ? 'बोलकर खोजें' : 'Voice'}
     </button>
   );

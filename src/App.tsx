@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import { MobileHome, MobilePart } from './pages/Mobile';
 
 const Splash = () => <div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>;
@@ -36,6 +37,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/m" element={<RequireAuth><MobileHome /></RequireAuth>} />
           <Route path="/m/part/:id" element={<RequireAuth><MobilePart /></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth admin><Dashboard /></RequireAuth>} />

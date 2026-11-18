@@ -2,14 +2,15 @@ import { useState, type ReactNode } from 'react';
 import type { Part } from '../lib/types';
 import { stockState } from '../lib/search';
 import { isConfigured } from '../lib/supabase';
+import { GearIcon } from './icons';
 
 /** Part photo that never breaks: a tidy placeholder shows if the link is missing or dead. */
 export function PartImage({ src, alt, className = '' }: { src: string | null; alt: string; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className={`flex items-center justify-center bg-slate-200 text-3xl text-slate-400 ${className}`} role="img" aria-label="No photo available">
-        ⚙️
+      <div className={`flex items-center justify-center bg-slate-200 text-slate-400 ${className}`} role="img" aria-label="No photo available">
+        <GearIcon className="h-1/3 w-1/3" />
       </div>
     );
   }
@@ -66,5 +67,9 @@ export function ConfigWarning() {
 }
 
 export function ErrorNote({ children }: { children: ReactNode }) {
-  return <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{children}</p>;
+  return <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{children}</p>;
+}
+
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-xl bg-slate-200 ${className}`} aria-hidden="true" />;
 }
