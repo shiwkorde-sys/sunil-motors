@@ -8,10 +8,11 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  displayName: string;
   signOut: () => Promise<void>;
 }
 
-const Ctx = createContext<AuthState>({ session: null, profile: null, loading: true, isAdmin: false, signOut: async () => {} });
+const Ctx = createContext<AuthState>({ session: null, profile: null, loading: true, isAdmin: false, displayName: '', signOut: async () => {} });
 export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ session, profile, loading, isAdmin: profile?.role === 'admin', signOut: async () => void (await supabase.auth.signOut()) }}
+      value={{ session, profile, loading, isAdmin: profile?.role === 'admin', displayName: profile?.full_name?.trim() || profile?.email?.split('@')[0] || '', signOut: async () => void (await supabase.auth.signOut()) }}
     >
       {children}
     </Ctx.Provider>
