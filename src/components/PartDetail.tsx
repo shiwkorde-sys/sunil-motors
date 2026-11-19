@@ -13,9 +13,11 @@ interface Props {
   onOpenPart: (id: string) => void;
   /** Mobile: Read aloud + Checkout stay pinned at the bottom of the screen, in thumb reach. */
   sticky?: boolean;
+  /** Mobile: speak the stock details as soon as the part opens (the button replays it). */
+  autoRead?: boolean;
 }
 
-export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = false }: Props) {
+export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = false, autoRead = false }: Props) {
   const [checkout, setCheckout] = useState(false);
   const [alts, setAlts] = useState<Part[]>([]);
   const [altsLoading, setAltsLoading] = useState(false);
@@ -49,6 +51,20 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
           : null,
     );
   }
+
+  // Read the part aloud as soon as it opens; stop talking when the mechanic leaves the page.
+  useEffect(() => {
+    if (!autoRead) return;
+    readOut();
+    return () => {
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {
+        /* audio not supported */
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [part.id, autoRead]);
 
   const actions = (
     <div className="mx-auto grid max-w-lg grid-cols-2 gap-3">

@@ -160,6 +160,7 @@ export function MobilePart() {
           <PartDetail
             part={part}
             sticky
+            autoRead
             onCheckedOut={(msg) => nav('/m', { state: { toast: msg } })} // back to the home screen after checkout
             onOpenPart={(pid) => nav(`/m/part/${pid}`)}
           />
