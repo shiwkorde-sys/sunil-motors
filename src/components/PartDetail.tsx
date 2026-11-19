@@ -67,15 +67,11 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
   }, [part.id, autoRead]);
 
   const actions = (
-    <div className="mx-auto grid max-w-lg grid-cols-2 gap-3">
-      <button onClick={readOut} className="flex h-14 items-center justify-center gap-2 rounded-xl bg-slate-800 font-bold text-white active:scale-95">
-        <SpeakerIcon className="h-6 w-6" />
-        {lang === 'hi' ? 'सुनें' : 'Read aloud'}
-      </button>
+    <div className="mx-auto max-w-lg">
       <button
         onClick={() => setCheckout(true)}
         disabled={out}
-        className="h-14 rounded-xl bg-brand font-bold text-white active:scale-95 disabled:bg-slate-300 disabled:text-slate-500"
+        className="h-14 w-full rounded-xl bg-brand text-lg font-bold text-white active:scale-95 disabled:bg-slate-300 disabled:text-slate-500"
       >
         {out ? 'Out of stock' : 'Checkout part'}
       </button>
@@ -83,9 +79,19 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
   );
 
   return (
-    <div className={`space-y-4 ${sticky ? 'pb-28' : ''}`}>
+    <div className={`space-y-4 ${sticky ? 'pb-36' : ''}`}>
       <div>
-        <h1 className="font-display text-3xl font-bold uppercase leading-tight">{part.name}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="min-w-0 font-display text-3xl font-bold uppercase leading-tight">{part.name}</h1>
+          <button
+            onClick={readOut}
+            aria-label={lang === 'hi' ? 'सुनें' : 'Read aloud'}
+            title={lang === 'hi' ? 'सुनें' : 'Read aloud'}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white active:scale-95"
+          >
+            <SpeakerIcon className="h-6 w-6" />
+          </button>
+        </div>
         <p className="text-sm text-slate-500">{[part.company, part.category].filter(Boolean).join(' · ')}</p>
         <div className="mt-2">
           <StockBadge part={part} big />
@@ -162,7 +168,7 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
       )}
 
       {sticky ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-300 bg-white px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">{actions}</div>
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-300 bg-white px-4 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-3">{actions}</div>
       ) : (
         actions
       )}

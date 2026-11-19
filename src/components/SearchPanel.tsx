@@ -72,7 +72,7 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
   const icon = large ? 'h-7 w-7' : 'h-5 w-5';
 
   const camera = (
-    <button onClick={() => fileRef.current?.click()} disabled={camBusy} className={`${btn} ${size} bg-brand`} aria-label="Search by camera">
+    <button onClick={() => fileRef.current?.click()} disabled={camBusy} className={`${btn} ${size} !text-brand border-2 border-brand bg-white !shadow-none`} aria-label="Search by camera">
       <CameraIcon className={icon} />
       {camBusy ? 'Looking…' : 'Camera'}
     </button>
@@ -80,7 +80,7 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
   const mic = (
     <button
       onClick={voice.listening ? voice.stop : voice.start}
-      className={`${btn} ${size} ${voice.listening ? 'animate-pulse bg-green-600' : 'bg-slate-800'}`}
+      className={`${btn} ${size} ${voice.listening ? 'animate-pulse bg-green-600' : 'bg-brand'}`}
       aria-label="Search by voice"
     >
       <MicIcon className={icon} />
@@ -96,9 +96,9 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
         // Docked at the bottom edge so thumbs reach it without stretching.
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-300 bg-slate-100 px-4 pb-[calc(3.75rem+env(safe-area-inset-bottom))] pt-3">
           {/* extra bottom space keeps the buttons clear of Netlify's floating badge */}
-          <div className="mx-auto grid max-w-lg grid-cols-2 gap-3">
-            {camera}
+          <div className="mx-auto grid max-w-lg grid-cols-[1.7fr_1fr] gap-3">
             {mic}
+            {camera}
           </div>
         </div>
       ) : null}
