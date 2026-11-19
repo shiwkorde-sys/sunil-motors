@@ -11,7 +11,7 @@ export default {
         '4xl': ['2.0625rem', { lineHeight: '2.25rem' }], // 33
         '5xl': ['2.625rem', { lineHeight: '1' }], // 42
       },
-      colors: { brand: { DEFAULT: '#1d4ed8', dark: '#1e40af' } },
+      colors: { brand: { DEFAULT: '#0369a1', dark: '#075985' } },
       fontFamily: {
         sans: ['"IBM Plex Sans"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
         display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
