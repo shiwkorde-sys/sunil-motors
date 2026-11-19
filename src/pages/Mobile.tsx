@@ -47,10 +47,10 @@ function Header({ back }: { back?: boolean }) {
   );
 }
 
-function ChipRow({ label, items, active, onPick }: { label: string; items: string[]; active: string; onPick: (v: string) => void }) {
+function ChipRow({ label, items, active, onPick, compact = false }: { label: string; items: string[]; active: string; onPick: (v: string) => void; compact?: boolean }) {
   return (
     <div>
-      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
+      {!compact && <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {items.map((i) => {
           const on = active.trim().toLowerCase() === i.toLowerCase();
@@ -109,15 +109,22 @@ export function MobileHome() {
           </div>
         )}
 
-        <h1 className="font-display text-3xl font-bold uppercase leading-none">
-          {lang === 'hi' ? 'नमस्ते' : 'Hi'}
-          {displayName ? `, ${displayName.split(' ')[0]}` : ''}
-        </h1>
+        {!searching && (
+          <h1 className="font-display text-3xl font-bold uppercase leading-none">
+            {lang === 'hi' ? 'नमस्ते' : 'Hi'}
+            {displayName ? `, ${displayName.split(' ')[0]}` : ''}
+          </h1>
+        )}
 
         <SearchPanel query={query} onChange={setQuery} parts={parts} large />
 
-        <ChipRow label="Bike brand" items={BRANDS} active={query.vehicle} onPick={(v) => pick('vehicle', v)} />
-        <ChipRow label="Part type" items={TYPES} active={query.part} onPick={(v) => pick('part', v)} />
+        {/* While searching, the quick filters shrink (and hide for voice/photo) so results sit right under the search boxes. */}
+        {!query.any.trim() && (
+          <>
+            <ChipRow label="Bike brand" items={BRANDS} active={query.vehicle} onPick={(v) => pick('vehicle', v)} compact={searching} />
+            <ChipRow label="Part type" items={TYPES} active={query.part} onPick={(v) => pick('part', v)} compact={searching} />
+          </>
+        )}
 
         {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
         {loading && (
