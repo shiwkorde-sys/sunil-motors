@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { setLang, useLang } from '../lib/lang';
 import { emptyQuery, isSearching, searchParts, type Query } from '../lib/search';
 import { useParts } from '../lib/useParts';
+import { CheckBadge, stagger } from '../components/motion';
 import PartDetail from '../components/PartDetail';
 import SearchPanel from '../components/SearchPanel';
 import { ArrowLeft, ChevronRight, PinIcon } from '../components/icons';
@@ -72,8 +73,8 @@ export function MobileHome() {
       <ConfigWarning />
       <main className="space-y-3 p-3">
         {toast && (
-          <div role="status" className="flex items-start justify-between gap-3 rounded-xl bg-green-100 p-3 font-semibold text-green-900">
-            <span>{toast}</span>
+          <div role="status" className="anim-down flex items-center justify-between gap-3 rounded-xl bg-green-100 p-3 font-semibold text-green-900">
+            <span className="flex items-center gap-3"><CheckBadge />{toast}</span>
             <button onClick={() => setToast(null)} className="-mr-1 -mt-1 h-9 w-9 shrink-0 text-2xl leading-none" aria-label="Dismiss">
               ×
             </button>
@@ -86,7 +87,7 @@ export function MobileHome() {
         {loading && (
           <div className="space-y-3" aria-label="Loading parts">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-200" />
+              <div key={i} className="shimmer h-24 rounded-2xl bg-slate-200" />
             ))}
           </div>
         )}
@@ -114,8 +115,8 @@ export function MobileHome() {
         )}
 
         <ul className="space-y-3">
-          {results.slice(0, 60).map((p) => (
-            <li key={p.id}>
+          {results.slice(0, 60).map((p, i) => (
+            <li key={p.id} className="anim-up" style={stagger(i)}>
               <button onClick={() => nav(`/m/part/${p.id}`)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm active:bg-slate-50">
                 <PartImage src={p.image_url} alt="" className="h-20 w-20 shrink-0 rounded-xl" />
                 <span className="min-w-0 flex-1">
