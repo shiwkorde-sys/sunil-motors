@@ -9,8 +9,6 @@ import SearchPanel from '../components/SearchPanel';
 import { ArrowLeft, ChevronRight, PinIcon } from '../components/icons';
 import { ConfigWarning, ErrorNote, PartImage, StockBadge } from '../components/ui';
 
-const BRANDS = ['Honda', 'Hero', 'Bajaj', 'TVS', 'Royal Enfield', 'Suzuki', 'Ather'];
-const TYPES = ['Brake', 'Clutch', 'Belt', 'Filter', 'Shock', 'Switch', 'Cable', 'Sensor'];
 const EXAMPLES = ['Splendor clutch plate', 'Activa belt', 'Pulsar rear brake'];
 const EXAMPLES_HI = ['स्प्लेंडर क्लच प्लेट', 'एक्टिवा बेल्ट', 'पल्सर रियर ब्रेक'];
 
@@ -47,29 +45,6 @@ function Header({ back }: { back?: boolean }) {
   );
 }
 
-function ChipRow({ label, items, active, onPick, compact = false }: { label: string; items: string[]; active: string; onPick: (v: string) => void; compact?: boolean }) {
-  return (
-    <div aria-label={label} role="group">
-      {!compact && <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>}
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
-        {items.map((i) => {
-          const on = active.trim().toLowerCase() === i.toLowerCase();
-          return (
-            <button
-              key={i}
-              onClick={() => onPick(i)}
-              aria-pressed={on}
-              className={`h-10 shrink-0 rounded-full border px-4 text-sm font-semibold ${on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'}`}
-            >
-              {i}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function MobileHome() {
   const { parts, loading, error } = useParts();
   const lang = useLang();
@@ -89,9 +64,6 @@ export function MobileHome() {
   const searching = isSearching(query);
   const results = useMemo(() => (searching ? searchParts(parts, query) : []), [parts, query, searching]);
 
-  const pick = (field: 'vehicle' | 'part', v: string) =>
-    setQuery((q) => ({ vehicle: field === 'vehicle' ? (q.vehicle.trim().toLowerCase() === v.toLowerCase() ? '' : v) : q.vehicle, part: field === 'part' ? (q.part.trim().toLowerCase() === v.toLowerCase() ? '' : v) : q.part, any: '' }));
-
   const examples = lang === 'hi' ? EXAMPLES_HI : EXAMPLES;
 
   return (
@@ -109,14 +81,6 @@ export function MobileHome() {
         )}
 
         <SearchPanel query={query} onChange={setQuery} parts={parts} large />
-
-        {/* While searching, the quick filters shrink (and hide for voice/photo) so results sit right under the search boxes. */}
-        {!query.any.trim() && (
-          <>
-            <ChipRow label="Bike brand" items={BRANDS} active={query.vehicle} onPick={(v) => pick('vehicle', v)} compact />
-            <ChipRow label="Part type" items={TYPES} active={query.part} onPick={(v) => pick('part', v)} compact />
-          </>
-        )}
 
         {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
         {loading && (

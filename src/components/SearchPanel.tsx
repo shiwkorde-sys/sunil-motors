@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLang } from '../lib/lang';
 import { emptyQuery, type Query } from '../lib/search';
 import { useVoiceSearch } from '../lib/speech';
@@ -6,7 +6,8 @@ import { photoToBase64 } from '../lib/image';
 import { supabase } from '../lib/supabase';
 import type { Part } from '../lib/types';
 import { CameraIcon, MicIcon } from './icons';
-import { inputCls } from './ui';
+import Combobox from './Combobox';
+import { searchParts } from '../lib/search';
 
 interface Props {
   query: Query;
@@ -21,6 +22,25 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
   const [camMsg, setCamMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const lang = useLang();
+
+  // Dropdown lists come from the shop's own stock. Part choices narrow to the chosen vehicle.
+  const vehicleOptions = useMemo(() => {
+    const set = new Set<string>();
+    parts.forEach((p) => {
+      if (p.company) set.add(p.company);
+      p.compatible_models.forEach((m) => set.add(m));
+    });
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [parts]);
+  const partOptions = useMemo(() => {
+    const pool = query.vehicle.trim() ? searchParts(parts, { vehicle: query.vehicle, part: '', any: '' }) : parts;
+    const set = new Set<string>();
+    pool.forEach((p) => {
+      if (p.category) set.add(p.category);
+      set.add(p.name.replace(/\s*\(.*?\)\s*/g, ' ').trim());
+    });
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [parts, query.vehicle]);
 
   const voice = useVoiceSearch((text) => onChange({ vehicle: '', part: '', any: text }));
 
@@ -83,22 +103,24 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
         </div>
       ) : null}
 
-      <div className={large ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-[auto_auto_1fr_1fr] items-center gap-3'}>
+      <div className={large ? 'space-y-2' : 'grid grid-cols-[auto_auto_1fr_1fr] items-center gap-3'}>
         {!large && camera}
         {!large && mic}
-        <input
-          className={inputCls + (large ? ' h-12 text-base' : '')}
-          placeholder="Vehicle  e.g. Activa, Splendor"
+        <Combobox
+          label="Vehicle name"
+          large={large}
           value={query.vehicle}
-          onChange={(e) => onChange({ ...query, vehicle: e.target.value, any: '' })}
-          aria-label="Vehicle name"
+          onChange={(v) => onChange({ ...query, vehicle: v, any: '' })}
+          options={vehicleOptions}
+          placeholder="Vehicle: pick or type (Activa, Splendor…)"
         />
-        <input
-          className={inputCls + (large ? ' h-12 text-base' : '')}
-          placeholder="Part  e.g. Brake Shoe"
+        <Combobox
+          label="Part name"
+          large={large}
           value={query.part}
-          onChange={(e) => onChange({ ...query, part: e.target.value, any: '' })}
-          aria-label="Part name"
+          onChange={(v) => onChange({ ...query, part: v, any: '' })}
+          options={partOptions}
+          placeholder="Part: pick or type (Brake, Clutch…)"
         />
       </div>
 
