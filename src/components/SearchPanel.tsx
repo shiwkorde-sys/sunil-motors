@@ -48,8 +48,8 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
   }
 
   const btn = 'flex items-center justify-center gap-2 rounded-2xl font-bold text-white shadow transition active:scale-95 disabled:opacity-60';
-  const size = large ? 'h-24 flex-col text-xl' : 'h-12 px-5 text-base';
-  const icon = large ? 'h-9 w-9' : 'h-5 w-5';
+  const size = large ? 'h-16 text-lg' : 'h-12 px-5 text-base';
+  const icon = large ? 'h-7 w-7' : 'h-5 w-5';
 
   const camera = (
     <button onClick={() => fileRef.current?.click()} disabled={camBusy} className={`${btn} ${size} bg-brand`} aria-label="Search by camera">
@@ -69,12 +69,13 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
 
       {large ? (
         // Docked at the bottom edge so thumbs reach it without stretching.
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-300 bg-slate-100 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-300 bg-slate-100 px-4 pb-[calc(3.75rem+env(safe-area-inset-bottom))] pt-3">
+          {/* extra bottom space keeps the buttons clear of Netlify's floating badge */}
           <div className="mx-auto grid max-w-lg grid-cols-2 gap-3">
             {camera}
             {mic}
@@ -82,19 +83,19 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
         </div>
       ) : null}
 
-      <div className={large ? 'space-y-3' : 'grid grid-cols-[auto_auto_1fr_1fr] items-center gap-3'}>
+      <div className={large ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-[auto_auto_1fr_1fr] items-center gap-3'}>
         {!large && camera}
         {!large && mic}
         <input
-          className={inputCls + (large ? ' h-14 text-lg' : '')}
-          placeholder="Vehicle (Honda Activa, Splendor…)"
+          className={inputCls + (large ? ' h-12 text-base' : '')}
+          placeholder="Vehicle  e.g. Activa, Splendor"
           value={query.vehicle}
           onChange={(e) => onChange({ ...query, vehicle: e.target.value, any: '' })}
           aria-label="Vehicle name"
         />
         <input
-          className={inputCls + (large ? ' h-14 text-lg' : '')}
-          placeholder="Part (Brake Shoe, Clutch Plate…)"
+          className={inputCls + (large ? ' h-12 text-base' : '')}
+          placeholder="Part  e.g. Brake Shoe"
           value={query.part}
           onChange={(e) => onChange({ ...query, part: e.target.value, any: '' })}
           aria-label="Part name"
