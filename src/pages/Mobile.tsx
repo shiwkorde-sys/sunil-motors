@@ -9,8 +9,6 @@ import SearchPanel from '../components/SearchPanel';
 import { ArrowLeft, ChevronRight, PinIcon } from '../components/icons';
 import { ConfigWarning, ErrorNote, PartImage, StockBadge } from '../components/ui';
 
-const BRANDS = ['Honda', 'Hero', 'Bajaj', 'TVS', 'Royal Enfield', 'Suzuki', 'Ather'];
-const TYPES = ['Brake', 'Clutch', 'Belt', 'Filter', 'Shock', 'Switch', 'Cable', 'Sensor'];
 const EXAMPLES = ['Splendor clutch plate', 'Activa belt', 'Pulsar rear brake'];
 const EXAMPLES_HI = ['स्प्लेंडर क्लच प्लेट', 'एक्टिवा बेल्ट', 'पल्सर रियर ब्रेक'];
 
@@ -47,32 +45,8 @@ function Header({ back }: { back?: boolean }) {
   );
 }
 
-function ChipRow({ label, items, active, onPick }: { label: string; items: string[]; active: string; onPick: (v: string) => void }) {
-  return (
-    <div>
-      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        {items.map((i) => {
-          const on = active.trim().toLowerCase() === i.toLowerCase();
-          return (
-            <button
-              key={i}
-              onClick={() => onPick(i)}
-              aria-pressed={on}
-              className={`h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${on ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white text-slate-700'}`}
-            >
-              {i}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function MobileHome() {
   const { parts, loading, error } = useParts();
-  const { displayName } = useAuth();
   const lang = useLang();
   const [query, setQuery] = useState<Query>(emptyQuery);
   const nav = useNavigate();
@@ -90,16 +64,13 @@ export function MobileHome() {
   const searching = isSearching(query);
   const results = useMemo(() => (searching ? searchParts(parts, query) : []), [parts, query, searching]);
 
-  const pick = (field: 'vehicle' | 'part', v: string) =>
-    setQuery((q) => ({ vehicle: field === 'vehicle' ? (q.vehicle.trim().toLowerCase() === v.toLowerCase() ? '' : v) : q.vehicle, part: field === 'part' ? (q.part.trim().toLowerCase() === v.toLowerCase() ? '' : v) : q.part, any: '' }));
-
   const examples = lang === 'hi' ? EXAMPLES_HI : EXAMPLES;
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg pb-44">
+    <div className="mx-auto min-h-screen max-w-lg pb-40">
       <Header />
       <ConfigWarning />
-      <main className="space-y-4 p-4">
+      <main className="space-y-3 p-3">
         {toast && (
           <div role="status" className="flex items-start justify-between gap-3 rounded-xl bg-green-100 p-3 font-semibold text-green-900">
             <span>{toast}</span>
@@ -109,15 +80,7 @@ export function MobileHome() {
           </div>
         )}
 
-        <h1 className="font-display text-3xl font-bold uppercase leading-none">
-          {lang === 'hi' ? 'नमस्ते' : 'Hi'}
-          {displayName ? `, ${displayName.split(' ')[0]}` : ''}
-        </h1>
-
         <SearchPanel query={query} onChange={setQuery} parts={parts} large />
-
-        <ChipRow label="Bike brand" items={BRANDS} active={query.vehicle} onPick={(v) => pick('vehicle', v)} />
-        <ChipRow label="Part type" items={TYPES} active={query.part} onPick={(v) => pick('part', v)} />
 
         {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
         {loading && (
@@ -129,17 +92,14 @@ export function MobileHome() {
         )}
 
         {!loading && !error && !searching && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="font-semibold">{lang === 'hi' ? 'ऐसे खोजें' : 'Try searching'}</h2>
-            <p className="mb-3 text-sm text-slate-600">Pick a brand or part type above, type, speak, or take a photo. Or tap an example:</p>
-            <div className="flex flex-wrap gap-2">
-              {examples.map((e) => (
-                <button key={e} onClick={() => setQuery({ vehicle: '', part: '', any: e })} className="h-11 rounded-full bg-slate-100 px-4 text-sm font-medium text-slate-800 active:bg-slate-200">
-                  “{e}”
-                </button>
-              ))}
-            </div>
-          </section>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500">{lang === 'hi' ? 'आज़माएँ:' : 'Try:'}</span>
+            {examples.map((e) => (
+              <button key={e} onClick={() => setQuery({ vehicle: '', part: '', any: e })} className="h-10 rounded-full bg-slate-100 px-3 text-sm font-medium text-slate-800 active:bg-slate-200">
+                {e}
+              </button>
+            ))}
+          </div>
         )}
 
         {!loading && !error && searching && (
@@ -200,6 +160,7 @@ export function MobilePart() {
           <PartDetail
             part={part}
             sticky
+            autoRead
             onCheckedOut={(msg) => nav('/m', { state: { toast: msg } })} // back to the home screen after checkout
             onOpenPart={(pid) => nav(`/m/part/${pid}`)}
           />

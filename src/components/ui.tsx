@@ -14,7 +14,8 @@ export function PartImage({ src, alt, className = '' }: { src: string | null; al
       </div>
     );
   }
-  return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={`object-cover ${className}`} />;
+  // no-referrer: many parts websites block photos when another site (like ours) asks for them. Sending no "referrer" avoids that.
+  return <img key={src} src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={`object-cover ${className}`} />;
 }
 
 export function StockBadge({ part, big = false }: { part: Part; big?: boolean }) {
