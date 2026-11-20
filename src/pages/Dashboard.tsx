@@ -49,7 +49,7 @@ export default function Dashboard() {
         {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
         {tab === 'Settings' && <SettingsPanel />}
         {tab === 'Import' && <ImportCsv reload={reload} />}
-        {tab === 'Sales' && <Sales />}
+        {tab === 'Sales' && <Sales parts={parts} />}
         {tab === 'Team' && <Team />}
       </main>
     </div>

@@ -2,34 +2,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { downloadCsv } from '../lib/csv';
 import { supabase } from '../lib/supabase';
 import type { Checkout } from '../lib/types';
+import type { Part } from '../lib/types';
+import DateRangePicker, { type DateRange } from './DateRangePicker';
 import { ErrorNote, inputCls } from './ui';
 
-type Range = 'today' | 'week' | 'month' | 'all' | 'custom';
 const ymd = (d: Date) => d.toLocaleDateString('en-CA'); // yyyy-mm-dd, local (India) day
 const startOf = (s: string) => new Date(s + 'T00:00:00');
+const inr0 = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
 
 /** Every part that left the shop (mechanic checkouts and counter sales). Read-only history. */
-export default function Sales() {
-  const [range, setRange] = useState<Range>('today');
-  const [from, setFrom] = useState(ymd(new Date()));
-  const [to, setTo] = useState(ymd(new Date()));
+export default function Sales({ parts }: { parts: Part[] }) {
+  const [range, setRange] = useState<DateRange>({ from: ymd(new Date()), to: ymd(new Date()) });
   const [text, setText] = useState('');
   const [rows, setRows] = useState<Checkout[]>([]);
-  const [bills, setBills] = useState<Record<string, string>>({});
+  const [bills, setBills] = useState<Record<string, { no: string; amount: number }>>({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const today = new Date();
-    let a: Date | null = null;
-    let b: Date | null = null;
-    if (range === 'today') a = startOf(ymd(today));
-    else if (range === 'week') a = new Date(startOf(ymd(today)).getTime() - 6 * 86400000);
-    else if (range === 'month') a = new Date(today.getFullYear(), today.getMonth(), 1);
-    else if (range === 'custom') {
-      a = startOf(from);
-      b = new Date(startOf(to).getTime() + 86400000);
-    }
+    const a = range.from ? startOf(range.from) : null;
+    const b = range.to ? new Date(startOf(range.to).getTime() + 86400000) : null;
     let alive = true;
     (async () => {
       setLoading(true);
@@ -48,10 +40,10 @@ export default function Sales() {
       setRows(list);
       // Which of these are already on a bill? (Only admins can read bills; this screen is admin-only.)
       const ids = list.map((r) => r.id);
-      const map: Record<string, string> = {};
+      const map: Record<string, { no: string; amount: number }> = {};
       for (let i = 0; i < ids.length; i += 150) {
-        const { data: its } = await supabase.from('invoice_items').select('checkout_id, invoices(invoice_number)').in('checkout_id', ids.slice(i, i + 150));
-        (its as unknown as { checkout_id: string; invoices: { invoice_number: string } | null }[] | null)?.forEach((x) => x.invoices && (map[x.checkout_id] = x.invoices.invoice_number));
+        const { data: its } = await supabase.from('invoice_items').select('checkout_id, line_total, invoices(invoice_number)').in('checkout_id', ids.slice(i, i + 150));
+        (its as unknown as { checkout_id: string; line_total: string; invoices: { invoice_number: string } | null }[] | null)?.forEach((x) => x.invoices && (map[x.checkout_id] = { no: x.invoices.invoice_number, amount: Number(x.line_total) }));
       }
       if (alive) {
         setBills(map);
@@ -61,7 +53,7 @@ export default function Sales() {
     return () => {
       alive = false;
     };
-  }, [range, from, to]);
+  }, [range]);
 
   const shown = useMemo(() => {
     const words = text.toLowerCase().split(/\s+/).filter(Boolean);
@@ -74,35 +66,51 @@ export default function Sales() {
   }, [rows, text]);
 
   const units = shown.reduce((n, r) => n + r.quantity, 0);
-  const chips: [Range, string][] = [['today', 'Today'], ['week', 'Last 7 days'], ['month', 'This month'], ['all', 'All'], ['custom', 'Pick dates']];
+  const price = useMemo(() => new Map(parts.map((p) => [p.id, p.price ?? 0])), [parts]);
+  const k = useMemo(() => {
+    const billed = shown.filter((r) => bills[r.id]);
+    const unbilled = shown.filter((r) => !bills[r.id]);
+    const top = (key: (r: Checkout) => string, weight: (r: Checkout) => number) => {
+      const m = new Map<string, number>();
+      shown.forEach((r) => m.set(key(r), (m.get(key(r)) ?? 0) + weight(r)));
+      return [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+    };
+    return {
+      revenue: billed.reduce((n, r) => n + bills[r.id].amount, 0),
+      billed: billed.length,
+      unbilled: unbilled.length,
+      unbilledValue: unbilled.reduce((n, r) => n + r.quantity * (price.get(r.part_id) ?? 0), 0),
+      topPart: top((r) => r.part_name, (r) => r.quantity),
+      topMechanic: top((r) => r.mechanic_name, () => 1),
+      vehicles: new Set(shown.map((r) => r.vehicle_registration).filter(Boolean)).size,
+    };
+  }, [shown, bills, price]);
 
   return (
     <>
       <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          {chips.map(([k, label]) => (
-            <button key={k} onClick={() => setRange(k)} aria-pressed={range === k} className={`h-10 rounded-full border px-4 text-sm font-semibold ${range === k ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white'}`}>
-              {label}
-            </button>
-          ))}
-          {range === 'custom' && (
-            <span className="flex flex-wrap items-center gap-2 text-sm">
-              <input type="date" max={ymd(new Date())} value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} className="h-10 rounded-xl border border-slate-300 px-3" aria-label="From date" />
-              to
-              <input type="date" max={ymd(new Date())} value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} className="h-10 rounded-xl border border-slate-300 px-3" aria-label="To date" />
-            </span>
-          )}
+        <div className="flex flex-wrap items-center gap-3">
+          <DateRangePicker value={range} onChange={setRange} />
+          <input className={inputCls + ' min-w-0 flex-1 sm:min-w-[18rem]'} placeholder="Search part, SKU, vehicle number, mechanic or job…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search sales" />
         </div>
-        <input className={inputCls} placeholder="Search by part name, SKU, vehicle number, mechanic or job…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search sales" />
       </div>
+
+      <section aria-label="Key numbers for this filter" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <Kpi label="Billed revenue" value={inr0(k.revenue)} note={`${k.billed} billed sale${k.billed === 1 ? '' : 's'}`} tone="brand" />
+        <Kpi label="Sales" value={String(shown.length)} note={`${units} part${units === 1 ? '' : 's'} sold`} />
+        <Kpi label="Not billed yet" value={String(k.unbilled)} note={k.unbilled ? `about ${inr0(k.unbilledValue)} at list price` : 'all sales are billed'} tone={k.unbilled ? 'warn' : 'ok'} />
+        <Kpi label="Top part" value={k.topPart ? k.topPart[0] : '-'} note={k.topPart ? `${k.topPart[1]} sold` : ''} small />
+        <Kpi label="Busiest mechanic" value={k.topMechanic ? k.topMechanic[0] : '-'} note={k.topMechanic ? `${k.topMechanic[1]} sale${k.topMechanic[1] === 1 ? '' : 's'}` : ''} small />
+        <Kpi label="Vehicles served" value={String(k.vehicles)} note="different vehicle numbers" />
+      </section>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-500" aria-live="polite">
-          {loading ? 'Loading…' : `${shown.length} sale${shown.length === 1 ? '' : 's'} · ${units} part${units === 1 ? '' : 's'} sold`}
+          {loading ? 'Loading…' : `Showing ${shown.length} of ${rows.length}`}
           {rows.length >= 1000 && ' · showing the latest 1,000, narrow the dates to see others'}
           <span className="ml-2">Read-only history. Entries cannot be edited or deleted.</span>
         </p>
-        <button onClick={() => downloadCsv('sales.csv', shown.map((r) => ({ ...r, bill: bills[r.id] ?? '' })))} disabled={!shown.length} className="rounded-xl bg-white px-4 py-2 font-semibold shadow-sm disabled:opacity-50">
+        <button onClick={() => downloadCsv('sales.csv', shown.map((r) => ({ ...r, bill: bills[r.id]?.no ?? '' })))} disabled={!shown.length} className="rounded-xl bg-white px-4 py-2 font-semibold shadow-sm disabled:opacity-50">
           Export CSV
         </button>
       </div>
@@ -122,12 +130,23 @@ export default function Sales() {
                 <td className="px-4 py-2">{r.mechanic_name}</td>
                 <td className="px-4 py-2 font-mono">{r.vehicle_registration ?? '-'}</td>
                 <td className="px-4 py-2">{r.job_reference}</td>
-                <td className="px-4 py-2">{bills[r.id] ? <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">{bills[r.id]}</span> : <span className="text-xs text-slate-400">Not billed</span>}</td>
+                <td className="px-4 py-2">{bills[r.id] ? <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">{bills[r.id].no}</span> : <span className="text-xs text-slate-400">Not billed</span>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </>
+  );
+}
+
+function Kpi({ label, value, note, tone, small = false }: { label: string; value: string; note?: string; tone?: 'brand' | 'warn' | 'ok'; small?: boolean }) {
+  const color = tone === 'brand' ? 'text-brand' : tone === 'warn' ? 'text-amber-700' : tone === 'ok' ? 'text-green-700' : 'text-slate-900';
+  return (
+    <div className="anim-up min-w-0 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
+      <div className={`mt-1 font-display font-bold leading-tight ${color} ${small ? 'line-clamp-2 text-xl' : 'text-3xl'}`} title={value}>{value}</div>
+      {note && <div className="mt-0.5 text-xs text-slate-500">{note}</div>}
+    </div>
   );
 }
