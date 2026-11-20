@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import type { Part } from '../lib/types';
 import { CameraIcon, MicIcon } from './icons';
 import Combobox from './Combobox';
+import { EqBars, Spinner } from './motion';
 import { searchParts } from '../lib/search';
 
 interface Props {
@@ -73,17 +74,18 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
 
   const camera = (
     <button onClick={() => fileRef.current?.click()} disabled={camBusy} className={`${btn} ${size} !text-brand border-2 border-brand bg-white !shadow-none`} aria-label="Search by camera">
-      <CameraIcon className={icon} />
+      {camBusy ? <Spinner className="h-6 w-6" /> : <CameraIcon className={icon} />}
       {camBusy ? 'Looking…' : 'Camera'}
     </button>
   );
   const mic = (
     <button
       onClick={voice.listening ? voice.stop : voice.start}
-      className={`${btn} ${size} ${voice.listening ? 'animate-pulse bg-green-600' : 'bg-brand'}`}
+      className={`${btn} ${size} relative ${voice.listening ? 'bg-green-600' : 'bg-brand'}`}
       aria-label="Search by voice"
     >
-      <MicIcon className={icon} />
+      {voice.listening && <span className="ripple-ring pointer-events-none absolute inset-0 rounded-2xl bg-green-500" aria-hidden="true" />}
+      {voice.listening ? <EqBars className="relative h-7" /> : <MicIcon className={icon} />}
       {voice.listening ? (lang === 'hi' ? 'बोलिए…' : 'Listening…') : lang === 'hi' ? 'बोलकर खोजें' : 'Voice'}
     </button>
   );

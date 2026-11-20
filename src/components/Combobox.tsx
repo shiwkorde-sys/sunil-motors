@@ -53,7 +53,7 @@ export default function Combobox({ label, value, onChange, options, placeholder,
       </div>
 
       {open && (
-        <ul role="listbox" className="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-300 bg-white shadow-lg">
+        <ul role="listbox" className="anim-scale absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-300 bg-white shadow-lg">
           {shown.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">No match. Your typing is still used for the search.</li>}
           {shown.map((o) => (
             <li key={o} role="option" aria-selected={o.toLowerCase() === q}>

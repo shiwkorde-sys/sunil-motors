@@ -5,6 +5,7 @@ import { speak, stockSentence } from '../lib/speech';
 import type { Part } from '../lib/types';
 import CheckoutSheet from './CheckoutSheet';
 import { ChevronRight, PinIcon, SpeakerIcon } from './icons';
+import { CountUp, stagger } from './motion';
 import { PartImage, StockBadge } from './ui';
 
 interface Props {
@@ -79,7 +80,7 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
   );
 
   return (
-    <div className={`space-y-4 ${sticky ? 'pb-36' : ''}`}>
+    <div key={part.id} className={`anim-up space-y-4 ${sticky ? 'pb-36' : ''}`}>
       <div>
         <div className="flex items-start justify-between gap-3">
           <h1 className="min-w-0 font-display text-3xl font-bold uppercase leading-tight">{part.name}</h1>
@@ -106,7 +107,7 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
             <span className="break-words">{part.shelf_location || 'Not set'}</span>
           </div>
           <div className="shrink-0 text-right">
-            <div className="font-display text-5xl font-bold leading-none">{part.quantity_available}</div>
+            <div className="font-display text-5xl font-bold leading-none"><CountUp value={part.quantity_available} key={part.id} /></div>
             <div className="text-xs text-slate-300">in stock</div>
           </div>
         </div>
@@ -146,8 +147,8 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
           {altsError && <p className="text-sm text-red-700">Could not load alternatives. Check your connection.</p>}
           {!altsLoading && !altsError && alts.length === 0 && <p className="text-sm text-slate-700">No compatible in-stock alternative found. Ask the owner to reorder.</p>}
           <ul className="space-y-2">
-            {alts.map((a) => (
-              <li key={a.id}>
+            {alts.map((a, i) => (
+              <li key={a.id} className="anim-up" style={stagger(i)}>
                 <button onClick={() => onOpenPart(a.id)} className="flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left shadow-sm active:bg-slate-50">
                   <PartImage src={a.image_url} alt="" className="h-14 w-14 shrink-0 rounded-lg" />
                   <span className="min-w-0 flex-1">
