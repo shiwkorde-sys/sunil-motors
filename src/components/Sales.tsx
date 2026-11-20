@@ -193,15 +193,15 @@ export default function Sales({ parts }: { parts: Part[] }) {
             </StatCard>
 
             <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} caption={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : 'no sales yet'}>
-              <SplitBar billedPct={k.billedPct} unbilledPct={k.unbilledPct} grow={grow} empty={k.total === 0} />
+              <Ring grow={grow} slices={k.total ? [{ label: 'Billed', value: k.billed, color: COLORS.green }, { label: 'Not billed', value: k.unbilled, color: COLORS.amber }] : []} />
             </StatCard>
 
-            <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} caption={k.mechs[0] ? `${k.mechs[0].pct}% of all sales · top 3 by amount` : 'no sales yet'}>
-              <Ranked items={k.mechs.map((m) => ({ name: m.name, text: rupee(m.amount), value: m.amount }))} grow={grow} />
+            <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} caption={k.mechs[0] ? `${k.mechs[0].name} · share of all sales` : 'no sales yet'}>
+              <Ring grow={grow} slices={shares(k.mechs.map((m) => ({ label: m.name, value: m.amount })), k.total)} />
             </StatCard>
 
-            <StatCard label="Most sold part" value={k.topParts[0] ? <><CountUp value={k.topParts[0].qty} /> <span className="text-base font-medium text-slate-500">sold</span></> : '–'} caption={k.topParts[0] ? 'Top 3 by pieces sold' : 'no sales yet'}>
-              <Ranked items={k.topParts.map((x) => ({ name: x.name, text: String(x.qty), value: x.qty }))} grow={grow} />
+            <StatCard label="Most sold part" value={k.topParts[0] ? <><CountUp value={k.topParts[0].qty} /> <span className="text-base font-medium text-slate-500">sold</span></> : '–'} caption={k.topParts[0] ? `${k.topParts[0].name} · share of parts sold` : 'no sales yet'}>
+              <Ring grow={grow} slices={shares(k.topParts.map((x) => ({ label: x.name, value: x.qty })), k.units)} />
             </StatCard>
           </section>
         </div>
@@ -292,35 +292,45 @@ function Bars({ series, grow }: { series: { key: string; label: string; amount: 
   );
 }
 
-/** One bar split into billed (green) and not billed (amber), with the shares written under it. */
-function SplitBar({ billedPct, unbilledPct, grow, empty }: { billedPct: number; unbilledPct: number; grow: boolean; empty: boolean }) {
-  if (empty) return <Empty />;
-  return (
-    <div className="flex h-full flex-col justify-end gap-2" role="img" aria-label={`${billedPct}% billed, ${unbilledPct}% not billed`}>
-      <div className="flex h-8 overflow-hidden rounded-lg bg-slate-100">
-        <div className="h-full bg-green-500 transition-[width] duration-700 ease-out" style={{ width: grow ? `${billedPct}%` : '0%' }} />
-        <div className="h-full bg-amber-400 transition-[width] duration-700 ease-out" style={{ width: grow ? `${unbilledPct}%` : '0%' }} />
-      </div>
-      <div className="flex justify-between text-xs text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-green-500" />Billed {billedPct}%</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" />Not billed {unbilledPct}%</span>
-      </div>
-    </div>
-  );
+const COLORS = { green: '#22c55e', amber: '#fbbf24', rest: '#cbd5e1', set: ['#0369a1', '#38bdf8', '#bae6fd'] };
+
+/** Top 3 slices plus "Others", coloured from dark to light blue. */
+function shares(items: { label: string; value: number }[], total: number) {
+  if (!items.length || total <= 0) return [];
+  const rest = total - items.reduce((n, i) => n + i.value, 0);
+  const out = items.map((i, n) => ({ ...i, color: COLORS.set[n] }));
+  if (rest > 0.5) out.push({ label: 'Others', value: rest, color: COLORS.rest });
+  return out;
 }
 
-/** Up to three ranked lines: a bar behind the name, the figure on the right. */
-function Ranked({ items, grow }: { items: { name: string; text: string; value: number }[]; grow: boolean }) {
-  if (items.length === 0) return <Empty />;
-  const max = items[0].value || 1;
+/** Donut + short legend. Shows each slice's share, so it reads the same whether there are 3 mechanics or 300. */
+function Ring({ slices, grow }: { slices: { label: string; value: number; color: string }[]; grow: boolean }) {
+  const total = slices.reduce((n, s) => n + s.value, 0);
+  if (!total) return <Empty />;
+  const r = 28;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  const pct = slices.map((s) => Math.round((s.value / total) * 100));
   return (
-    <div className="flex h-full flex-col justify-end gap-1.5">
-      {items.map((it, i) => (
-        <div key={it.name} title={`${it.name}: ${it.text}`} className="relative h-5 overflow-hidden rounded-md bg-slate-100">
-          <div className={`absolute inset-y-0 left-0 rounded-md transition-[width] duration-700 ease-out ${i === 0 ? 'bg-sky-300' : 'bg-sky-200'}`} style={{ width: grow ? `${Math.max((it.value / max) * 100, 6)}%` : '0%' }} />
-          <div className="relative flex h-full items-center justify-between gap-2 px-2 text-xs"><span className="truncate font-medium text-slate-800">{it.name}</span><span className="shrink-0 text-slate-600">{it.text}</span></div>
-        </div>
-      ))}
+    <div className="flex h-full items-center gap-3">
+      <svg viewBox="0 0 72 72" className="h-full shrink-0 -rotate-90" role="img" aria-label={slices.map((s, i) => `${s.label} ${pct[i]}%`).join(', ')}>
+        <circle cx="36" cy="36" r={r} fill="none" stroke="#f1f5f9" strokeWidth="11" />
+        {slices.map((s, i) => {
+          const len = (s.value / total) * c;
+          const el = <circle key={s.label} cx="36" cy="36" r={r} fill="none" stroke={s.color} strokeWidth="11" strokeDasharray={`${grow ? Math.max(len - 1, 0) : 0} ${c}`} strokeDashoffset={-offset} className="transition-[stroke-dasharray] duration-700 ease-out" />;
+          offset += len;
+          return el;
+        })}
+      </svg>
+      <ul className="min-w-0 flex-1 space-y-0.5 text-xs">
+        {slices.map((s, i) => (
+          <li key={s.label} className="flex items-center gap-1.5" title={`${s.label}: ${pct[i]}%`}>
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
+            <span className="truncate text-slate-700">{s.label}</span>
+            <span className="ml-auto shrink-0 font-semibold text-slate-900">{pct[i]}%</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
