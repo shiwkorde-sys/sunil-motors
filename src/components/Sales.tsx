@@ -112,7 +112,7 @@ export default function Sales({ parts }: { parts: Part[] }) {
       part.set(r.part_name, (part.get(r.part_name) ?? 0) + r.quantity);
       sold.set(r.part_id, (sold.get(r.part_id) ?? 0) + r.quantity);
     });
-    const mechs = [...mech.entries()].sort((a, b) => b[1].amount - a[1].amount || b[1].sales - a[1].sales).slice(0, 3).map(([name, m]) => ({ name, amount: m.amount, pct: total > 0 ? Math.round((m.amount / total) * 100) : 0 }));
+    const mechs = [...mech.entries()].sort((a, b) => b[1].amount - a[1].amount || b[1].sales - a[1].sales).slice(0, 3).map(([name, m]) => ({ name, vehicles: m.vehicles.size, amount: m.amount, pct: total > 0 ? Math.round((m.amount / total) * 100) : 0 }));
     const topParts = [...part.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, qty]) => ({ name: shortName(name), qty }));
 
     // Money over time: by hour for one day, by day up to ~6 weeks, otherwise by month.
@@ -188,21 +188,13 @@ export default function Sales({ parts }: { parts: Part[] }) {
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showStats ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="overflow-hidden">
           <section aria-label="Key numbers" className={`grid grid-cols-1 gap-3 p-1 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${loading ? 'opacity-60' : ''}`}>
-            <StatCard label="Total sales" value={<CountUp value={k.total} format={rupee} />} caption={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')} · ${plural(k.vehicles, 'vehicle')}`}>
-              <Bars series={k.series} grow={grow} />
-            </StatCard>
+            <StatCard label="Total sales" value={<CountUp value={k.total} format={rupee} />} line={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')}`} note={plural(k.vehicles, 'vehicle')} visual={k.series.length >= 3 ? <Bars series={k.series} grow={grow} /> : undefined} />
 
-            <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} caption={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : 'no sales yet'}>
-              <Ring grow={grow} slices={k.total ? [{ label: 'Billed', value: k.billed, color: COLORS.green }, { label: 'Not billed', value: k.unbilled, color: COLORS.amber }] : []} />
-            </StatCard>
+            <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} line={k.total ? `${k.billedPct}% of sales` : 'no sales yet'} note={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : ''} visual={k.total ? <BilledRing pct={k.billedPct} grow={grow} /> : undefined} />
 
-            <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} caption={k.mechs[0] ? `${k.mechs[0].name} · share of all sales` : 'no sales yet'}>
-              <Ring grow={grow} slices={shares(k.mechs.map((m) => ({ label: m.name, value: m.amount })), k.total)} />
-            </StatCard>
+            <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} line={k.mechs[0]?.name ?? 'no sales yet'} note={k.mechs[0] ? `${k.mechs[0].pct}% of sales · ${plural(k.mechs[0].vehicles, 'vehicle')}` : ''} />
 
-            <StatCard label="Most sold part" value={k.topParts[0] ? <><CountUp value={k.topParts[0].qty} /> <span className="text-base font-medium text-slate-500">sold</span></> : '–'} caption={k.topParts[0] ? `${k.topParts[0].name} · share of parts sold` : 'no sales yet'}>
-              <Ring grow={grow} slices={shares(k.topParts.map((x) => ({ label: x.name, value: x.qty })), k.units)} />
-            </StatCard>
+            <StatCard label="Most sold part" value={k.topParts[0] ? <><CountUp value={k.topParts[0].qty} /> <span className="text-base font-medium text-slate-500">sold</span></> : '–'} line={k.topParts[0]?.name ?? 'no sales yet'} note={k.topParts[0] && k.units ? `${Math.round((k.topParts[0].qty / k.units) * 100)}% of parts sold` : ''} />
           </section>
         </div>
       </div>
@@ -262,23 +254,23 @@ export default function Sales({ parts }: { parts: Part[] }) {
   );
 }
 
-const VISUAL = 'h-[4.75rem]'; // every card's picture is the same height, so the four cards line up
-
-/** Same shape for every stat: label, one big number, a picture, one line of detail. */
-function StatCard({ label, value, caption, children }: { label: string; value: React.ReactNode; caption: string; children: React.ReactNode }) {
+/** Same shape for every stat: label, one big number, a name, one small note. A picture is added only where it helps. */
+function StatCard({ label, value, line, note, visual }: { label: string; value: React.ReactNode; line: string; note: string; visual?: React.ReactNode }) {
   return (
-    <div className="anim-up flex min-w-0 flex-col gap-2 rounded-2xl bg-white p-4 shadow-sm">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className="font-display text-3xl font-bold leading-none">{value}</div>
-      <div className={VISUAL}>{children}</div>
-      <div className="truncate text-xs text-slate-500" title={caption}>{caption}</div>
+    <div className="anim-up flex min-w-0 items-start justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        <div className="font-display text-3xl font-bold leading-tight">{value}</div>
+        <div className="line-clamp-2 text-sm font-medium text-slate-700" title={line}>{line}</div>
+        <div className="line-clamp-2 text-xs text-slate-500" title={note}>{note || '\u00a0'}</div>
+      </div>
+      {visual && <div className="mt-1 h-14 w-16 shrink-0">{visual}</div>}
     </div>
   );
 }
 
 /** Money by hour / day / month as small bars. The best one is dark. Hover or tap a bar to read it. */
 function Bars({ series, grow }: { series: { key: string; label: string; amount: number }[]; grow: boolean }) {
-  if (series.length === 0) return <Empty />;
   const max = Math.max(...series.map((b) => b.amount), 1);
   const peak = series.reduce((a, b) => (b.amount > a.amount ? b : a));
   return (
@@ -292,47 +284,17 @@ function Bars({ series, grow }: { series: { key: string; label: string; amount: 
   );
 }
 
-const COLORS = { green: '#22c55e', amber: '#fbbf24', rest: '#cbd5e1', set: ['#0369a1', '#38bdf8', '#bae6fd'] };
-
-/** Top 3 slices plus "Others", coloured from dark to light blue. */
-function shares(items: { label: string; value: number }[], total: number) {
-  if (!items.length || total <= 0) return [];
-  const rest = total - items.reduce((n, i) => n + i.value, 0);
-  const out = items.map((i, n) => ({ ...i, color: COLORS.set[n] }));
-  if (rest > 0.5) out.push({ label: 'Others', value: rest, color: COLORS.rest });
-  return out;
-}
-
-/** Donut + short legend. Shows each slice's share, so it reads the same whether there are 3 mechanics or 300. */
-function Ring({ slices, grow }: { slices: { label: string; value: number; color: string }[]; grow: boolean }) {
-  const total = slices.reduce((n, s) => n + s.value, 0);
-  if (!total) return <Empty />;
-  const r = 28;
+/** Small ring: how much of the money is billed. */
+function BilledRing({ pct, grow }: { pct: number; grow: boolean }) {
+  const r = 24;
   const c = 2 * Math.PI * r;
-  let offset = 0;
-  const pct = slices.map((s) => Math.round((s.value / total) * 100));
   return (
-    <div className="flex h-full items-center gap-3">
-      <svg viewBox="0 0 72 72" className="h-full shrink-0 -rotate-90" role="img" aria-label={slices.map((s, i) => `${s.label} ${pct[i]}%`).join(', ')}>
-        <circle cx="36" cy="36" r={r} fill="none" stroke="#f1f5f9" strokeWidth="11" />
-        {slices.map((s, i) => {
-          const len = (s.value / total) * c;
-          const el = <circle key={s.label} cx="36" cy="36" r={r} fill="none" stroke={s.color} strokeWidth="11" strokeDasharray={`${grow ? Math.max(len - 1, 0) : 0} ${c}`} strokeDashoffset={-offset} className="transition-[stroke-dasharray] duration-700 ease-out" />;
-          offset += len;
-          return el;
-        })}
+    <div className="relative mx-auto h-14 w-14" role="img" aria-label={`${pct}% billed`}>
+      <svg viewBox="0 0 60 60" className="h-full w-full -rotate-90">
+        <circle cx="30" cy="30" r={r} fill="none" stroke="#fbbf24" strokeWidth="9" />
+        <circle cx="30" cy="30" r={r} fill="none" stroke="#22c55e" strokeWidth="9" strokeDasharray={c} strokeDashoffset={grow ? c * (1 - pct / 100) : c} className="transition-[stroke-dashoffset] duration-700 ease-out" />
       </svg>
-      <ul className="min-w-0 flex-1 space-y-0.5 text-xs">
-        {slices.map((s, i) => (
-          <li key={s.label} className="flex items-center gap-1.5" title={`${s.label}: ${pct[i]}%`}>
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
-            <span className="truncate text-slate-700">{s.label}</span>
-            <span className="ml-auto shrink-0 font-semibold text-slate-900">{pct[i]}%</span>
-          </li>
-        ))}
-      </ul>
+      <div className="absolute inset-0 flex items-center justify-center font-display text-sm font-bold">{pct}%</div>
     </div>
   );
 }
-
-const Empty = () => <div className="flex h-full items-center justify-center rounded-lg bg-slate-50 text-xs text-slate-300">Nothing to show yet</div>;
