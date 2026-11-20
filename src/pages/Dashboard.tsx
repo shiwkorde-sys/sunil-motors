@@ -7,13 +7,14 @@ import { supabase } from '../lib/supabase';
 import type { Checkout, Part, Profile } from '../lib/types';
 import { useParts } from '../lib/useParts';
 import Billing from '../components/Billing';
+import Sales from '../components/Sales';
 import SettingsPanel from '../components/SettingsPanel';
 import PartDetail from '../components/PartDetail';
 import PartForm from '../components/PartForm';
 import SearchPanel from '../components/SearchPanel';
 import { ConfigWarning, ErrorNote, Modal, StockBadge } from '../components/ui';
 
-const TABS = ['Overview', 'Inventory', 'Billing', 'Import', 'Checkout log', 'Team', 'Settings'] as const;
+const TABS = ['Overview', 'Inventory', 'Billing', 'Import', 'Sales', 'Team', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function Dashboard() {
@@ -48,7 +49,7 @@ export default function Dashboard() {
         {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
         {tab === 'Settings' && <SettingsPanel />}
         {tab === 'Import' && <ImportCsv reload={reload} />}
-        {tab === 'Checkout log' && <Log />}
+        {tab === 'Sales' && <Sales />}
         {tab === 'Team' && <Team />}
       </main>
     </div>
@@ -216,41 +217,6 @@ function ImportCsv({ reload }: { reload: () => void }) {
   );
 }
 
-function Log() {
-  const [rows, setRows] = useState<Checkout[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.from('checkout_transactions').select('*').order('created_at', { ascending: false }).limit(500)
-      .then(({ data, error }) => (error ? setErr(error.message) : setRows(data as Checkout[])));
-  }, []);
-  return (
-    <>
-      <div className="flex justify-between">
-        <p className="text-sm text-slate-500">Read-only history. Entries cannot be edited or deleted.</p>
-        <button onClick={() => downloadCsv('checkouts.csv', rows.map((r) => ({ ...r })))} className="rounded-xl bg-white px-4 py-2 font-semibold shadow-sm">Export CSV</button>
-      </div>
-      {err && <ErrorNote>{err}</ErrorNote>}
-      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500"><tr>{['When', 'Part', 'Qty', 'Mechanic', 'Vehicle', 'Job ref'].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr></thead>
-          <tbody className="divide-y">
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td className="whitespace-nowrap px-4 py-2">{new Date(r.created_at).toLocaleString('en-IN')}</td>
-                <td className="px-4 py-2">{r.part_name} <span className="text-xs text-slate-400">{r.sku}</span></td>
-                <td className="px-4 py-2">{r.quantity}</td>
-                <td className="px-4 py-2">{r.mechanic_name}</td>
-                <td className="px-4 py-2 font-mono">{r.vehicle_registration ?? '-'}</td>
-                <td className="px-4 py-2">{r.job_reference}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
 function Team() {
   const { profile: me } = useAuth();
   const [people, setPeople] = useState<Profile[]>([]);
@@ -274,7 +240,7 @@ function Team() {
 
   return (
     <section className="max-w-2xl space-y-3">
-      <p className="text-sm text-slate-500">Mechanics create their own account on the login page. Each person's name is used in the checkout log. Promote someone to admin here, or send a password reset link if they forgot theirs.</p>
+      <p className="text-sm text-slate-500">Mechanics create their own account on the login page. Each person's name is used in the Sales list. Promote someone to admin here, or send a password reset link if they forgot theirs.</p>
       {err && <ErrorNote>{err}</ErrorNote>}
       {note && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{note}</p>}
       <ul className="divide-y rounded-2xl bg-white shadow-sm">

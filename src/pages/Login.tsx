@@ -83,7 +83,7 @@ export default function Login() {
 
         <form onSubmit={submit} className="space-y-4">
           {mode === 'up' && (
-            <Field label="Your full name (shown in the checkout log)">
+            <Field label="Your full name (shown in the Sales list)">
               <input id="name" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
             </Field>
           )}
