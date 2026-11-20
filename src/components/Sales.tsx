@@ -125,6 +125,22 @@ export default function Sales({ parts }: { parts: Part[] }) {
     };
   }, [shown, byId]);
 
+  const [showStats, setShowStats] = useState(() => {
+    try {
+      return localStorage.getItem('sales-stats') !== 'hidden';
+    } catch {
+      return true;
+    }
+  });
+  const toggleStats = () =>
+    setShowStats((v) => {
+      try {
+        localStorage.setItem('sales-stats', v ? 'hidden' : 'shown');
+      } catch {
+        /* private mode: fine, it just will not be remembered */
+      }
+      return !v;
+    });
   const [grow, setGrow] = useState(false);
   useEffect(() => {
     setGrow(false);
@@ -135,83 +151,53 @@ export default function Sales({ parts }: { parts: Part[] }) {
   const empty = !loading && shown.length === 0;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-slate-500">Every part that left the shop. Choose a period to see how you did.</p>
-      </div>
-
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
         <DateRangePicker value={range} onChange={setRange} />
         <input className={inputCls + ' min-w-0 flex-1 sm:min-w-[18rem]'} placeholder="Find a vehicle, mechanic, part or bill…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search sales" />
+        <button onClick={toggleStats} aria-expanded={showStats} className="h-11 shrink-0 rounded-xl bg-slate-100 px-4 text-sm font-semibold hover:bg-slate-200 active:scale-95">
+          {showStats ? 'Hide stats' : 'Show stats'}
+        </button>
       </div>
       {err && <ErrorNote>{err}</ErrorNote>}
 
-      {/* ───── Key numbers: all of them follow the date and search above ───── */}
-      <section aria-label="Key numbers" className={`grid gap-3 transition-opacity lg:grid-cols-4 ${loading ? 'opacity-60' : ''}`}>
-        <article className="anim-up relative overflow-hidden rounded-3xl bg-brand p-5 text-white shadow-sm lg:col-span-2" style={stagger(0)}>
-          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" aria-hidden="true" />
-          <div className="text-sm font-medium text-white/80">Total sales</div>
-          <div className="mt-1 font-display text-5xl font-bold leading-none tracking-tight"><CountUp value={k.total} format={rupee} /></div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/90">
-            <span>{plural(shown.length, 'sale')}</span>
-            <span>{plural(k.units, 'part')}</span>
-            <span>{plural(k.vehicles, 'vehicle')}</span>
-          </div>
-          <p className="mt-3 text-xs text-white/70">Includes sales without a bill. Those are valued at today's list price.</p>
-        </article>
-
-        <article className="anim-up rounded-3xl bg-white p-5 shadow-sm lg:col-span-2" style={stagger(1)}>
-          <div className="text-sm font-medium text-slate-500">Top seller</div>
-          {k.topMech ? (
-            <div className="mt-2 flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-sky-100 font-display text-2xl font-bold text-brand" aria-hidden="true">{k.topMech.name.trim().charAt(0).toUpperCase()}</div>
-              <div className="min-w-0">
-                <div className="truncate text-xl font-bold">{k.topMech.name}</div>
-                <div className="text-slate-700"><b className="font-display text-2xl"><CountUp value={k.topMech.amount} format={rupee} /></b> <span className="text-slate-500">· {k.topMech.pct}% of all sales</span></div>
-                <div className="text-sm text-slate-500">{plural(k.topMech.sales, 'sale')} · {plural(k.topMech.vehicles, 'vehicle')} · {plural(k.topMech.units, 'part')}</div>
+      {/* ───── Stats: one slim strip. Hide it when you only want the list. ───── */}
+      <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showStats ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          <section aria-label="Key numbers" className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-slate-200 shadow-sm transition-opacity lg:grid-cols-5 ${loading ? 'opacity-60' : ''}`}>
+            <Stat label="Total sales" sub={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')} · ${plural(k.vehicles, 'vehicle')}`} strong>
+              <CountUp value={k.total} format={rupee} />
+            </Stat>
+            <Stat label="Billed" sub={`${k.billedPct}% of sales`}>
+              <span className="text-green-700"><CountUp value={k.billed} format={rupee} /></span>
+            </Stat>
+            <Stat label="Not billed" sub={`${k.unbilledPct}% of sales${k.unpriced ? ` · ${k.unpriced} without price` : ''}`}>
+              <span className={k.unbilled ? 'text-amber-600' : ''}><CountUp value={k.unbilled} format={rupee} /></span>
+            </Stat>
+            <Stat label="Top seller" sub={k.topMech ? `${k.topMech.pct}% · ${plural(k.topMech.vehicles, 'vehicle')} · ${plural(k.topMech.units, 'part')}` : 'no sales yet'} title={k.topMech?.name}>
+              {k.topMech ? <><span className="block truncate text-base font-bold">{k.topMech.name}</span><CountUp value={k.topMech.amount} format={rupee} /></> : '–'}
+            </Stat>
+            <Stat label="Most sold part" sub={k.topPart ? `${k.topPart[1]} sold` : 'no sales yet'} title={k.topPart?.[0]}>
+              {k.topPart ? <span className="line-clamp-2 text-base font-bold leading-tight">{shortName(k.topPart[0])}</span> : '–'}
+            </Stat>
+            <div className="col-span-2 bg-white px-4 pb-3 lg:col-span-5">
+              <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${k.billedPct}% billed, ${k.unbilledPct}% not billed`}>
+                <div className="h-full bg-green-500 transition-[width] duration-700 ease-out" style={{ width: grow ? `${k.billedPct}%` : '0%' }} />
+                <div className="h-full bg-amber-400 transition-[width] duration-700 ease-out" style={{ width: grow ? `${k.unbilledPct}%` : '0%' }} />
               </div>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Sales without a bill use today's list price.
+                {k.low.length > 0 && <span className="ml-2 font-medium text-amber-700">Reorder soon: {k.low.slice(0, 3).map((p) => `${shortName(p.name)} (${p.quantity_available} left)`).join(', ')}{k.low.length > 3 ? ` +${k.low.length - 3}` : ''}</span>}
+              </p>
             </div>
-          ) : <p className="mt-3 text-slate-400">No sales to compare yet.</p>}
-        </article>
-
-        <article className="anim-up rounded-3xl bg-white p-5 shadow-sm lg:col-span-2" style={stagger(2)}>
-          <div className="flex items-baseline justify-between">
-            <div className="text-sm font-medium text-slate-500">Billed and not billed</div>
-            {k.total > 0 && <div className="text-xs text-slate-400">share of total sales</div>}
-          </div>
-          <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${k.billedPct}% billed, ${k.unbilledPct}% not billed`}>
-            <div className="h-full bg-green-500 transition-[width] duration-700 ease-out" style={{ width: grow ? `${k.billedPct}%` : '0%' }} />
-            <div className="h-full bg-amber-400 transition-[width] duration-700 ease-out" style={{ width: grow ? `${k.unbilledPct}%` : '0%' }} />
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-1.5 text-sm text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-green-500" />Billed · {k.billedPct}%</div>
-              <div className="font-display text-2xl font-bold"><CountUp value={k.billed} format={rupee} /></div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-sm text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" />Not billed · {k.unbilledPct}%</div>
-              <div className="font-display text-2xl font-bold"><CountUp value={k.unbilled} format={rupee} /></div>
-            </div>
-          </div>
-          {k.unpriced > 0 && <p className="mt-2 text-xs text-amber-700">{plural(k.unpriced, 'sale')} {k.unpriced === 1 ? 'has' : 'have'} no price yet, so {k.unpriced === 1 ? 'it is' : 'they are'} counted as ₹0. Add prices in Inventory.</p>}
-        </article>
-
-        <article className="anim-up rounded-3xl bg-white p-5 shadow-sm" style={stagger(3)}>
-          <div className="text-sm font-medium text-slate-500">Most sold part</div>
-          {k.topPart ? (
-            <>
-              <div className="mt-1 line-clamp-2 text-lg font-bold leading-snug" title={k.topPart[0]}>{shortName(k.topPart[0])}</div>
-              <div className="text-slate-500"><b className="font-display text-2xl text-slate-900"><CountUp value={k.topPart[1]} /></b> sold</div>
-            </>
-          ) : <p className="mt-2 text-slate-400">-</p>}
-        </article>
-
-        <article className="anim-up rounded-3xl bg-white p-5 shadow-sm" style={stagger(4)}>
-          <div className="text-sm font-medium text-slate-500">Reorder soon</div>
-          <div className={`mt-1 font-display text-3xl font-bold ${k.low.length ? 'text-amber-600' : 'text-green-600'}`}><CountUp value={k.low.length} /> <span className="text-base font-medium text-slate-500">{k.low.length === 1 ? 'part' : 'parts'}</span></div>
-          <p className="text-xs text-slate-500">{k.low.length ? `Sold here and nearly out: ${k.low.slice(0, 2).map((p) => `${shortName(p.name)} (${p.quantity_available} left)`).join(', ')}${k.low.length > 2 ? ` +${k.low.length - 2} more` : ''}` : 'Everything you sold here is well stocked.'}</p>
-        </article>
-      </section>
+          </section>
+        </div>
+      </div>
+      {!showStats && (
+        <p className="px-1 text-sm text-slate-500">
+          <b className="text-slate-800"><CountUp value={k.total} format={rupee} /></b> total · {plural(shown.length, 'sale')} · {k.unbilledPct}% not billed
+        </p>
+      )}
 
       {/* ───── The list ───── */}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -229,11 +215,11 @@ export default function Sales({ parts }: { parts: Part[] }) {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-3xl bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
-              {['Vehicle', 'Mechanic', 'When', 'Part', 'Qty', 'Price', 'Amount', 'Bill'].map((h, i) => <th key={h} className={`px-4 py-3 font-semibold ${i >= 4 && i <= 6 ? 'text-right' : ''}`}>{h}</th>)}
+              {['Vehicle', 'Mechanic', 'When', 'Part', 'Qty', 'Price', 'Amount', 'Bill'].map((h, i) => <th key={h} className={`px-3 py-2 font-semibold ${i >= 4 && i <= 6 ? 'text-right' : ''}`}>{h}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -245,20 +231,30 @@ export default function Sales({ parts }: { parts: Part[] }) {
             )}
             {shown.map((r, i) => (
               <tr key={r.id} className="anim-up hover:bg-slate-50/70" style={stagger(Math.min(i, 5))}>
-                <td className="whitespace-nowrap px-4 py-3 font-mono font-semibold">{r.vehicle_registration ?? <span className="font-sans font-normal text-slate-300">none</span>}</td>
-                <td className="whitespace-nowrap px-4 py-3">{r.mechanic_name}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-500">{new Date(r.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
-                <td className="px-4 py-3">{r.part_name}<div className="text-xs text-slate-400">{r.sku}</div></td>
-                <td className="px-4 py-3 text-right">{r.quantity}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{r.unit ? rupee2(r.unit) : <span className="text-amber-600">no price</span>}{!r.billed && r.unit > 0 && <span title="List price today, because there is no bill" className="ml-0.5 text-slate-300">*</span>}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{rupee2(r.amount)}</td>
-                <td className="whitespace-nowrap px-4 py-3">{r.billed ? <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">{r.billed.no}</span> : <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">No bill</span>}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono font-semibold">{r.vehicle_registration ?? <span className="font-sans font-normal text-slate-300">none</span>}</td>
+                <td className="whitespace-nowrap px-3 py-2">{r.mechanic_name}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-slate-500">{new Date(r.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
+                <td className="px-3 py-2">{r.part_name}<div className="text-xs text-slate-400">{r.sku}</div></td>
+                <td className="px-3 py-2 text-right">{r.quantity}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-right text-slate-600">{r.unit ? rupee2(r.unit) : <span className="text-amber-600">no price</span>}{!r.billed && r.unit > 0 && <span title="List price today, because there is no bill" className="ml-0.5 text-slate-300">*</span>}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">{rupee2(r.amount)}</td>
+                <td className="whitespace-nowrap px-3 py-2">{r.billed ? <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">{r.billed.no}</span> : <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">No bill</span>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <p className="text-xs text-slate-400">* No bill was made, so the price shown is today's list price. Billed sales show the price actually charged, with GST if it was added.</p>
+    </div>
+  );
+}
+
+function Stat({ label, sub, children, strong = false, title }: { label: string; sub: string; children: React.ReactNode; strong?: boolean; title?: string }) {
+  return (
+    <div className="min-w-0 bg-white px-4 py-3" title={title}>
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className={`font-display font-bold leading-tight ${strong ? 'text-3xl text-brand' : 'text-2xl'}`}>{children}</div>
+      <div className="truncate text-xs text-slate-500">{sub}</div>
     </div>
   );
 }
