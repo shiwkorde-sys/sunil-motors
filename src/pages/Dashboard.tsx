@@ -6,12 +6,14 @@ import { emptyQuery, searchParts, stockState, type Query } from '../lib/search';
 import { supabase } from '../lib/supabase';
 import type { Checkout, Part, Profile } from '../lib/types';
 import { useParts } from '../lib/useParts';
+import Billing from '../components/Billing';
+import SettingsPanel from '../components/SettingsPanel';
 import PartDetail from '../components/PartDetail';
 import PartForm from '../components/PartForm';
 import SearchPanel from '../components/SearchPanel';
 import { ConfigWarning, ErrorNote, Modal, StockBadge } from '../components/ui';
 
-const TABS = ['Overview', 'Inventory', 'Import', 'Checkout log', 'Team'] as const;
+const TABS = ['Overview', 'Inventory', 'Billing', 'Import', 'Checkout log', 'Team', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function Dashboard() {
@@ -43,6 +45,8 @@ export default function Dashboard() {
         {loading && <p className="text-slate-500">Loading…</p>}
         {tab === 'Overview' && <Overview parts={parts} />}
         {tab === 'Inventory' && <Inventory parts={parts} reload={reload} />}
+        {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
+        {tab === 'Settings' && <SettingsPanel />}
         {tab === 'Import' && <ImportCsv reload={reload} />}
         {tab === 'Checkout log' && <Log />}
         {tab === 'Team' && <Team />}
