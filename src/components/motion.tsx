@@ -1,22 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 
-/** Number that counts up to its value when it appears. */
-export function CountUp({ value, ms = 600 }: { value: number; ms?: number }) {
+/** Number that glides from its old value to the new one (formatting is up to the caller). */
+export function CountUp({ value, ms = 700, format }: { value: number; ms?: number; format?: (n: number) => string }) {
   const [n, setN] = useState(0);
-  const raf = useRef(0);
+  const prev = useRef(0);
   useEffect(() => {
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduce || value <= 0) return setN(value);
+    const start = prev.current;
+    if (reduce || start === value) {
+      prev.current = value;
+      return setN(value);
+    }
     const t0 = performance.now();
+    let raf = 0;
     const tick = (t: number) => {
       const k = Math.min(1, (t - t0) / ms);
-      setN(Math.round(value * (1 - Math.pow(1 - k, 3))));
-      if (k < 1) raf.current = requestAnimationFrame(tick);
+      setN(Math.round(start + (value - start) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else prev.current = value;
     };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      prev.current = value;
+    };
   }, [value, ms]);
-  return <>{n}</>;
+  return <>{format ? format(n) : n}</>;
 }
 
 /** Stagger helper: style for the i-th item in a list (capped so long lists don't wait). */
