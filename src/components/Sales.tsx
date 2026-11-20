@@ -71,7 +71,6 @@ export default function Sales({ parts }: { parts: Part[] }) {
   }, [range]);
 
   const listPrice = useMemo(() => new Map(parts.map((p) => [p.id, p.price ?? 0])), [parts]);
-  const byId = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts]);
 
   const sales: Sale[] = useMemo(
     () =>
@@ -113,17 +112,41 @@ export default function Sales({ parts }: { parts: Part[] }) {
       part.set(r.part_name, (part.get(r.part_name) ?? 0) + r.quantity);
       sold.set(r.part_id, (sold.get(r.part_id) ?? 0) + r.quantity);
     });
-    const topMech = [...mech.entries()].sort((a, b) => b[1].amount - a[1].amount || b[1].sales - a[1].sales)[0];
-    const topPart = [...part.entries()].sort((a, b) => b[1] - a[1])[0];
-    const low = [...sold.keys()].map((id) => byId.get(id)).filter((p): p is Part => !!p && p.quantity_available <= p.min_stock).sort((a, b) => a.quantity_available - b.quantity_available);
+    const mechs = [...mech.entries()].sort((a, b) => b[1].amount - a[1].amount || b[1].sales - a[1].sales).slice(0, 3).map(([name, m]) => ({ name, amount: m.amount, pct: total > 0 ? Math.round((m.amount / total) * 100) : 0 }));
+    const topParts = [...part.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, qty]) => ({ name: shortName(name), qty }));
+
+    // Money over time: by hour for one day, by day up to ~6 weeks, otherwise by month.
+    const oneDay = !!range.from && range.from === range.to;
+    const times = shown.map((r) => new Date(r.created_at).getTime());
+    const first = range.from ? startOf(range.from).getTime() : Math.min(...times);
+    const last = range.to ? startOf(range.to).getTime() : Math.max(...times);
+    const days = Math.round((last - first) / 86400000) + 1;
+    const mode: 'hour' | 'day' | 'month' = oneDay ? 'hour' : days <= 45 ? 'day' : 'month';
+    const keyOf = (t: number) => {
+      const d = new Date(t);
+      return mode === 'hour' ? String(d.getHours()) : mode === 'day' ? ymd(d) : ymd(d).slice(0, 7);
+    };
+    const sum = new Map<string, number>();
+    shown.forEach((r) => sum.set(keyOf(new Date(r.created_at).getTime()), (sum.get(keyOf(new Date(r.created_at).getTime())) ?? 0) + r.amount));
+    const series: { key: string; label: string; amount: number }[] = [];
+    if (shown.length) {
+      if (mode === 'hour') {
+        const hrs = [...sum.keys()].map(Number);
+        for (let h = Math.min(...hrs); h <= Math.max(...hrs); h++) series.push({ key: String(h), label: new Date(2000, 0, 1, h).toLocaleTimeString('en-IN', { hour: 'numeric' }), amount: sum.get(String(h)) ?? 0 });
+      } else if (mode === 'day') {
+        for (let t = first; t <= last; t += 86400000) series.push({ key: ymd(new Date(t)), label: new Date(t).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), amount: sum.get(ymd(new Date(t))) ?? 0 });
+      } else {
+        const ms = [...sum.keys()].sort();
+        ms.forEach((m) => series.push({ key: m, label: new Date(m + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }), amount: sum.get(m) ?? 0 }));
+      }
+    }
     const billedPct = total > 0 ? Math.round((billed / total) * 100) : 0;
     return {
       total, billed, unbilled, units, vehicles, billedPct, unbilledPct: total > 0 ? 100 - billedPct : 0,
       unpriced: shown.filter((r) => !r.billed && r.unit === 0).length,
-      topMech: topMech && { name: topMech[0], ...topMech[1], vehicles: topMech[1].vehicles.size, pct: total > 0 ? Math.round((topMech[1].amount / total) * 100) : 0 },
-      topPart, low,
+      mechs, topParts, series, mode,
     };
-  }, [shown, byId]);
+  }, [shown, range]);
 
   const [showStats, setShowStats] = useState(() => {
     try {
@@ -161,34 +184,45 @@ export default function Sales({ parts }: { parts: Part[] }) {
       </div>
       {err && <ErrorNote>{err}</ErrorNote>}
 
-      {/* ───── Stats: one slim strip. Hide it when you only want the list. ───── */}
+      {/* ───── Stats as pictures: money over time, billed ring, top sellers, top parts. Hide with the button. ───── */}
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showStats ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="overflow-hidden">
-          <section aria-label="Key numbers" className={`grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-slate-200 shadow-sm transition-opacity lg:grid-cols-5 ${loading ? 'opacity-60' : ''}`}>
-            <Stat label="Total sales" sub={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')} · ${plural(k.vehicles, 'vehicle')}`} strong>
-              <CountUp value={k.total} format={rupee} />
-            </Stat>
-            <Stat label="Billed" sub={`${k.billedPct}% of sales`}>
-              <span className="text-green-700"><CountUp value={k.billed} format={rupee} /></span>
-            </Stat>
-            <Stat label="Not billed" sub={`${k.unbilledPct}% of sales${k.unpriced ? ` · ${k.unpriced} without price` : ''}`}>
-              <span className={k.unbilled ? 'text-amber-600' : ''}><CountUp value={k.unbilled} format={rupee} /></span>
-            </Stat>
-            <Stat label="Top seller" sub={k.topMech ? `${k.topMech.pct}% · ${plural(k.topMech.vehicles, 'vehicle')} · ${plural(k.topMech.units, 'part')}` : 'no sales yet'} title={k.topMech?.name}>
-              {k.topMech ? <><span className="block truncate text-base font-bold">{k.topMech.name}</span><CountUp value={k.topMech.amount} format={rupee} /></> : '–'}
-            </Stat>
-            <Stat label="Most sold part" sub={k.topPart ? `${k.topPart[1]} sold` : 'no sales yet'} title={k.topPart?.[0]}>
-              {k.topPart ? <span className="line-clamp-2 text-base font-bold leading-tight">{shortName(k.topPart[0])}</span> : '–'}
-            </Stat>
-            <div className="col-span-2 bg-white px-4 pb-3 lg:col-span-5">
-              <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${k.billedPct}% billed, ${k.unbilledPct}% not billed`}>
-                <div className="h-full bg-green-500 transition-[width] duration-700 ease-out" style={{ width: grow ? `${k.billedPct}%` : '0%' }} />
-                <div className="h-full bg-amber-400 transition-[width] duration-700 ease-out" style={{ width: grow ? `${k.unbilledPct}%` : '0%' }} />
+          <section aria-label="Key numbers" className={`grid grid-cols-1 gap-px overflow-hidden rounded-2xl bg-slate-200 shadow-sm transition-opacity sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] ${loading ? 'opacity-60' : ''}`}>
+            {/* 1. Total sales + bars over time */}
+            <div className="min-w-0 bg-white px-4 py-3">
+              <div className="text-xs font-medium text-slate-500">Total sales</div>
+              <div className="font-display text-3xl font-bold leading-tight text-brand"><CountUp value={k.total} format={rupee} /></div>
+              <div className="truncate text-xs text-slate-500">{plural(shown.length, 'sale')} · {plural(k.units, 'part')} · {plural(k.vehicles, 'vehicle')}</div>
+              <Bars series={k.series} grow={grow} />
+            </div>
+
+            {/* 2. Billed ring */}
+            <div className="flex min-w-0 items-center gap-3 bg-white px-4 py-3">
+              <Ring pct={k.billedPct} grow={grow} empty={k.total === 0} />
+              <div className="min-w-0 text-sm">
+                <div className="text-xs font-medium text-slate-500">Billed or not</div>
+                <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" /><b className="text-green-700"><CountUp value={k.billed} format={rupee} /></b></div>
+                <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400" /><b className={k.unbilled ? 'text-amber-600' : 'text-slate-400'}><CountUp value={k.unbilled} format={rupee} /></b></div>
+                {k.unpriced > 0 && <div className="text-[11px] text-amber-700">{k.unpriced} without price</div>}
               </div>
-              <p className="mt-1.5 text-xs text-slate-500">
-                Sales without a bill use today's list price.
-                {k.low.length > 0 && <span className="ml-2 font-medium text-amber-700">Reorder soon: {k.low.slice(0, 3).map((p) => `${shortName(p.name)} (${p.quantity_available} left)`).join(', ')}{k.low.length > 3 ? ` +${k.low.length - 3}` : ''}</span>}
-              </p>
+            </div>
+
+            {/* 3. Top sellers */}
+            <div className="min-w-0 bg-white px-4 py-3">
+              <div className="mb-1.5 text-xs font-medium text-slate-500">Top sellers (₹)</div>
+              {k.mechs.length === 0 && <p className="text-sm text-slate-300">No sales yet</p>}
+              <div className="space-y-1.5">
+                {k.mechs.map((m, i) => <Row key={m.name} name={m.name} text={`${rupee(m.amount)} · ${m.pct}%`} width={(m.amount / (k.mechs[0].amount || 1)) * 100} grow={grow} color={i === 0 ? 'bg-brand' : 'bg-sky-300'} />)}
+              </div>
+            </div>
+
+            {/* 4. Most sold parts */}
+            <div className="min-w-0 bg-white px-4 py-3">
+              <div className="mb-1.5 text-xs font-medium text-slate-500">Most sold parts</div>
+              {k.topParts.length === 0 && <p className="text-sm text-slate-300">No sales yet</p>}
+              <div className="space-y-1.5">
+                {k.topParts.map((x, i) => <Row key={x.name} name={x.name} text={`${x.qty} sold`} width={(x.qty / (k.topParts[0].qty || 1)) * 100} grow={grow} color={i === 0 ? 'bg-brand' : 'bg-sky-300'} />)}
+              </div>
             </div>
           </section>
         </div>
@@ -249,12 +283,49 @@ export default function Sales({ parts }: { parts: Part[] }) {
   );
 }
 
-function Stat({ label, sub, children, strong = false, title }: { label: string; sub: string; children: React.ReactNode; strong?: boolean; title?: string }) {
+/** Little bar chart: money by hour / day / month. Tap or hover a bar to read it. */
+function Bars({ series, grow }: { series: { key: string; label: string; amount: number }[]; grow: boolean }) {
+  if (series.length === 0) return <div className="mt-2 h-10" />;
+  const max = Math.max(...series.map((b) => b.amount), 1);
+  const peak = series.reduce((a, b) => (b.amount > a.amount ? b : a));
   return (
-    <div className="min-w-0 bg-white px-4 py-3" title={title}>
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`font-display font-bold leading-tight ${strong ? 'text-3xl text-brand' : 'text-2xl'}`}>{children}</div>
-      <div className="truncate text-xs text-slate-500">{sub}</div>
+    <div className="mt-2">
+      <div className="flex h-10 items-end gap-[3px]" role="img" aria-label={`Sales over time. Best: ${peak.label}, ${rupee(peak.amount)}`}>
+        {series.map((b) => (
+          <div key={b.key} title={`${b.label}: ${rupee(b.amount)}`} className="flex h-full min-w-[3px] flex-1 items-end">
+            <div className={`w-full rounded-t-[3px] transition-[height] duration-700 ease-out ${b === peak ? 'bg-brand' : 'bg-sky-200'}`} style={{ height: grow ? `${Math.max(b.amount / max, b.amount > 0 ? 0.08 : 0.02) * 100}%` : '0%' }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-0.5 flex justify-between text-[10px] text-slate-400"><span>{series[0].label}</span><span>Best: {peak.label}</span><span>{series[series.length - 1].label}</span></div>
+    </div>
+  );
+}
+
+/** Ring that fills to the billed share. */
+function Ring({ pct, grow, empty }: { pct: number; grow: boolean; empty: boolean }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative h-16 w-16 shrink-0" role="img" aria-label={`${pct}% of sales are billed`}>
+      <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="8" className={empty ? 'stroke-slate-100' : 'stroke-amber-400'} />
+        {!empty && <circle cx="32" cy="32" r={r} fill="none" strokeWidth="8" strokeLinecap="butt" className="stroke-green-500 transition-[stroke-dashoffset] duration-700 ease-out" strokeDasharray={c} strokeDashoffset={grow ? c * (1 - pct / 100) : c} />}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+        <span className="font-display text-lg font-bold">{empty ? '–' : pct + '%'}</span>
+        <span className="text-[9px] text-slate-400">billed</span>
+      </div>
+    </div>
+  );
+}
+
+/** One ranked line: name, a bar, and its figure. */
+function Row({ name, text, width, grow, color }: { name: string; text: string; width: number; grow: boolean; color: string }) {
+  return (
+    <div title={`${name}: ${text}`}>
+      <div className="flex items-baseline justify-between gap-2 text-xs"><span className="truncate font-medium text-slate-700">{name}</span><span className="shrink-0 text-slate-500">{text}</span></div>
+      <div className="mt-0.5 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full transition-[width] duration-700 ease-out ${color}`} style={{ width: grow ? `${Math.max(width, 4)}%` : '0%' }} /></div>
     </div>
   );
 }
