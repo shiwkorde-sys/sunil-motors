@@ -66,6 +66,7 @@ export default function Sales({ parts }: { parts: Part[] }) {
   }, [rows, text]);
 
   const units = shown.reduce((n, r) => n + r.quantity, 0);
+  const byId = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts]);
   const price = useMemo(() => new Map(parts.map((p) => [p.id, p.price ?? 0])), [parts]);
   const k = useMemo(() => {
     const billed = shown.filter((r) => bills[r.id]);
@@ -82,9 +83,18 @@ export default function Sales({ parts }: { parts: Part[] }) {
       unbilledValue: unbilled.reduce((n, r) => n + r.quantity * (price.get(r.part_id) ?? 0), 0),
       topPart: top((r) => r.part_name, (r) => r.quantity),
       topMechanic: top((r) => r.mechanic_name, () => 1),
+      // parts that sold in this filter and are now at or below their minimum stock (best sellers first)
+      restock: (() => {
+        const sold = new Map<string, number>();
+        shown.forEach((r) => sold.set(r.part_id, (sold.get(r.part_id) ?? 0) + r.quantity));
+        return [...sold.entries()]
+          .map(([id, n]) => ({ part: byId.get(id), n }))
+          .filter((x): x is { part: Part; n: number } => !!x.part && x.part.quantity_available <= x.part.min_stock)
+          .sort((a, b) => b.n - a.n);
+      })(),
       vehicles: new Set(shown.map((r) => r.vehicle_registration).filter(Boolean)).size,
     };
-  }, [shown, bills, price]);
+  }, [shown, bills, price, byId]);
 
   return (
     <>
@@ -95,12 +105,13 @@ export default function Sales({ parts }: { parts: Part[] }) {
         </div>
       </div>
 
-      <section aria-label="Key numbers for this filter" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <section aria-label="Key numbers for this filter" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Billed revenue" value={inr0(k.revenue)} note={`${k.billed} billed sale${k.billed === 1 ? '' : 's'}`} tone="brand" />
         <Kpi label="Sales" value={String(shown.length)} note={`${units} part${units === 1 ? '' : 's'} sold`} />
         <Kpi label="Not billed yet" value={String(k.unbilled)} note={k.unbilled ? `about ${inr0(k.unbilledValue)} at list price` : 'all sales are billed'} tone={k.unbilled ? 'warn' : 'ok'} />
         <Kpi label="Top part" value={k.topPart ? k.topPart[0] : '-'} note={k.topPart ? `${k.topPart[1]} sold` : ''} small />
         <Kpi label="Busiest mechanic" value={k.topMechanic ? k.topMechanic[0] : '-'} note={k.topMechanic ? `${k.topMechanic[1]} sale${k.topMechanic[1] === 1 ? '' : 's'}` : ''} small />
+        <Kpi label="Restock soon" value={String(k.restock.length)} tone={k.restock.length ? 'warn' : 'ok'} note={k.restock.length ? k.restock.slice(0, 2).map((x) => `${x.part.name.replace(/\s*\(.*?\)\s*/g, ' ').trim()} (${x.part.quantity_available} left)`).join(', ') + (k.restock.length > 2 ? ` +${k.restock.length - 2} more` : '') : 'sold parts are well stocked'} />
         <Kpi label="Vehicles served" value={String(k.vehicles)} note="different vehicle numbers" />
       </section>
 
