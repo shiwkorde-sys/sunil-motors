@@ -4,6 +4,7 @@ import { emptyQuery, searchParts } from '../lib/search';
 import { supabase } from '../lib/supabase';
 import type { Checkout, CompanySettings, Invoice, InvoiceItem, Part } from '../lib/types';
 import InvoiceView from './InvoiceView';
+import { CheckBadge } from './motion';
 import { ErrorNote, Field, inputCls } from './ui';
 
 interface Line {
@@ -18,6 +19,8 @@ interface Line {
   fixedQty: boolean; // from a checkout: quantity was already taken from stock
   stock: number | null;
 }
+
+const todayStr = () => new Date().toLocaleDateString('en-CA'); // yyyy-mm-dd in the local (India) day
 
 export default function Billing({ parts, reload }: { parts: Part[]; reload: () => void }) {
   const [mode, setMode] = useState<'new' | 'history'>('new');
@@ -45,17 +48,29 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
   const [find, setFind] = useState('');
   const [pending, setPending] = useState<Checkout[]>([]);
   const [vehFilter, setVehFilter] = useState('');
+  const [when, setWhen] = useState<'today' | 'date' | 'all'>('today');
+  const [day, setDay] = useState(todayStr());
+  const [added, setAdded] = useState<string | null>(null);
+  const flash = (name: string) => {
+    setAdded(name);
+    setTimeout(() => setAdded((x) => (x === name ? null : x)), 2200);
+  };
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function loadPending() {
-    const [co, billed] = await Promise.all([
-      supabase.from('checkout_transactions').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('invoice_items').select('checkout_id').not('checkout_id', 'is', null),
-    ]);
+    let qy = supabase.from('checkout_transactions').select('*').order('created_at', { ascending: false }).limit(300);
+    if (when !== 'all') {
+      const d = when === 'today' ? todayStr() : day;
+      const from = new Date(d + 'T00:00:00'); // local (India) midnight
+      qy = qy.gte('created_at', from.toISOString()).lt('created_at', new Date(from.getTime() + 86400000).toISOString());
+    }
+    const co = await qy;
     if (co.error) return setErr(co.error.message);
-    const done = new Set((billed.data ?? []).map((r) => r.checkout_id as string));
-    setPending((co.data as Checkout[]).filter((c) => !done.has(c.id)));
+    const rows = co.data as Checkout[];
+    const billed = rows.length ? await supabase.from('invoice_items').select('checkout_id').in('checkout_id', rows.map((r) => r.id)) : { data: [] as { checkout_id: string }[] };
+    const done = new Set((billed.data ?? []).map((r) => r.checkout_id));
+    setPending(rows.filter((c) => !done.has(c.id)));
   }
 
   useEffect(() => {
@@ -65,8 +80,11 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
       setSettings(s);
       setGst(s.gst_default_on);
     });
-    loadPending();
   }, []);
+  useEffect(() => {
+    loadPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [when, day]);
 
   const rate0 = settings?.default_gst_rate ?? 18;
   const incl = settings?.prices_include_gst ?? true;
@@ -76,6 +94,7 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
 
   const addPart = (p: Part) => {
     setFind('');
+    flash(p.name);
     setLines((ls) => {
       const ex = ls.find((l) => l.part_id === p.id && !l.checkout_id);
       if (ex) return ls.map((l) => (l === ex ? { ...l, qty: Math.min(l.qty + 1, p.quantity_available) } : l));
@@ -83,6 +102,7 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
     });
   };
   const addCheckout = (c: Checkout) => {
+    flash(c.part_name);
     const p = partById.get(c.part_id);
     setLines((ls) => [...ls, { key: crypto.randomUUID(), part_id: c.part_id, checkout_id: c.id, sku: c.sku, name: c.part_name, qty: c.quantity, price: p?.price ?? 0, rate: rate0, fixedQty: true, stock: null }]);
     if (!cust.vehicle && c.vehicle_registration) setCust((x) => ({ ...x, vehicle: c.vehicle_registration! }));
@@ -120,7 +140,7 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
+    <div className="grid items-start gap-4 xl:grid-cols-[1fr_27rem]">
       <div className="space-y-4">
         <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
           <h2 className="font-semibold">Customer</h2>
@@ -132,79 +152,97 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
           </div>
         </section>
 
-        <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="font-semibold">Add parts</h2>
-          <div className="relative">
-            <input className={inputCls} placeholder="Search your stock: type a part name or SKU…" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a part to add" />
-            {matches.length > 0 && (
-              <ul className="anim-scale absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-slate-300 bg-white shadow-lg">
-                {matches.map((p) => (
-                  <li key={p.id}>
-                    <button onClick={() => addPart(p)} disabled={p.quantity_available === 0} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-slate-50 disabled:opacity-50">
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{p.name}</span>
-                        <span className="block text-xs text-slate-500">{p.sku} · {p.quantity_available} in stock</span>
-                      </span>
-                      <span className="shrink-0 font-semibold">{p.price ? inr(p.price) : 'no price'}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+        <section className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
+          <div>
+            <h2 className="mb-2 font-semibold">Add parts from stock</h2>
+            <div className="relative">
+              <input className={inputCls} placeholder="Type a part name or SKU…" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find a part to add" />
+              {matches.length > 0 && (
+                <ul className="anim-scale absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-slate-300 bg-white shadow-lg">
+                  {matches.map((p) => (
+                    <li key={p.id}>
+                      <button onClick={() => addPart(p)} disabled={p.quantity_available === 0} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-slate-50 disabled:opacity-50">
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{p.name}</span>
+                          <span className="block text-xs text-slate-500">{p.sku} · {p.quantity_available} in stock</span>
+                        </span>
+                        <span className="shrink-0 font-semibold">{p.price ? inr(p.price) : 'no price'}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
-          <details open={pending.length > 0} className="rounded-xl bg-slate-50 p-3">
-            <summary className="cursor-pointer font-medium">Mechanic checkouts not yet billed ({pending.length})</summary>
-            <p className="mt-1 text-xs text-slate-500">Stock was already taken when the mechanic checked out, so adding these will not reduce stock again.</p>
-            <input className={inputCls + ' mt-2'} placeholder="Filter by vehicle number" value={vehFilter} onChange={(e) => setVehFilter(e.target.value)} aria-label="Filter checkouts by vehicle" />
-            <ul className="mt-2 max-h-64 space-y-1.5 overflow-auto">
-              {shownPending.length === 0 && <li className="py-2 text-sm text-slate-500">Nothing to bill.</li>}
+          <div className="rounded-xl bg-slate-50 p-3">
+            <h2 className="font-semibold">Mechanic checkouts not yet billed ({shownPending.length})</h2>
+            <p className="text-xs text-slate-500">Stock was already taken at checkout, so adding these will not reduce stock again.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {([['today', 'Today'], ['date', 'Pick a date'], ['all', 'All dates']] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setWhen(k)} aria-pressed={when === k} className={`h-10 rounded-full border px-4 text-sm font-semibold ${when === k ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white'}`}>{label}</button>
+              ))}
+              {when === 'date' && <input type="date" max={todayStr()} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} className="h-10 rounded-xl border border-slate-300 bg-white px-3" aria-label="Checkout date" />}
+            </div>
+            <input className={inputCls + ' mt-2'} placeholder="Search by vehicle number (works for any day you chose)" value={vehFilter} onChange={(e) => setVehFilter(e.target.value)} aria-label="Filter checkouts by vehicle" />
+            <ul className="mt-2 max-h-72 space-y-1.5 overflow-auto">
+              {shownPending.length === 0 && <li className="py-2 text-sm text-slate-500">{when === 'today' ? 'No unbilled checkouts today. Pick another date or "All dates" to look further back.' : 'Nothing to bill for this choice.'}</li>}
               {shownPending.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 shadow-sm">
                   <span className="min-w-0 text-sm">
                     <span className="block truncate font-medium">{c.quantity} × {c.part_name}</span>
-                    <span className="block truncate text-xs text-slate-500">{c.mechanic_name} · {c.vehicle_registration ?? 'no vehicle'} · {new Date(c.created_at).toLocaleDateString('en-IN')}</span>
+                    <span className="block truncate text-xs text-slate-500">{c.mechanic_name} · {c.vehicle_registration ?? 'no vehicle'} · {new Date(c.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                   </span>
-                  <button onClick={() => addCheckout(c)} className="h-10 shrink-0 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white">Add</button>
+                  <button onClick={() => addCheckout(c)} className="h-10 shrink-0 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white active:scale-95">Add to bill</button>
                 </li>
               ))}
             </ul>
-          </details>
-        </section>
-
-        <section className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>{['Part', 'Qty', 'Price', ...(gst ? ['GST %'] : []), 'Amount', ''].map((h) => <th key={h} className="px-3 py-3 font-medium">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y">
-              {lines.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">No parts added yet.</td></tr>}
-              {lines.map((l, i) => (
-                <tr key={l.key} className="anim-up align-middle">
-                  <td className="px-3 py-2"><div className="font-medium">{l.name}</div><div className="text-xs text-slate-400">{l.sku}{l.fixedQty ? ' · from checkout' : ''}</div></td>
-                  <td className="px-3 py-2">
-                    {l.fixedQty ? l.qty : <input type="number" min={1} max={l.stock ?? undefined} className="h-10 w-16 rounded-lg border border-slate-300 px-2" value={l.qty} onChange={(e) => patch(l.key, { qty: Math.max(1, Math.min(l.stock ?? 9999, Math.floor(Number(e.target.value) || 1))) })} />}
-                  </td>
-                  <td className="px-3 py-2"><input type="number" min={0} step="0.01" className={`h-10 w-24 rounded-lg border px-2 ${l.price > 0 ? 'border-slate-300' : 'border-amber-400 bg-amber-50'}`} value={l.price || ''} placeholder="0" onChange={(e) => patch(l.key, { price: Math.max(0, Number(e.target.value) || 0) })} /></td>
-                  {gst && <td className="px-3 py-2"><input type="number" min={0} max={100} step="0.5" className="h-10 w-16 rounded-lg border border-slate-300 px-2" value={l.rate} onChange={(e) => patch(l.key, { rate: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} /></td>}
-                  <td className="whitespace-nowrap px-3 py-2 font-semibold">{inr(calc[i].total)}</td>
-                  <td className="px-3 py-2"><button onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} aria-label={`Remove ${l.name}`} className="h-10 w-10 text-2xl text-slate-400">×</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          </div>
         </section>
       </div>
 
-      <aside className="h-fit space-y-3 rounded-2xl bg-white p-4 shadow-sm xl:sticky xl:top-4">
-        <label className="flex items-center gap-3">
-          <input type="checkbox" className="h-5 w-5" checked={gst} onChange={(e) => setGst(e.target.checked)} />
-          <span className="font-semibold">Add GST (tax invoice)</span>
-        </label>
-        {gst && <p className="text-xs text-slate-500">{incl ? 'Prices include GST; the tax is shown inside the total.' : 'GST is added on top of the prices.'}</p>}
+      {/* The bill: always beside the inputs on a wide screen, so added parts are seen straight away. */}
+      <aside id="bill" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold uppercase">This bill ({lines.length})</h2>
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" className="h-5 w-5" checked={gst} onChange={(e) => setGst(e.target.checked)} />
+            Add GST
+          </label>
+        </div>
+        {added && <div role="status" className="anim-down flex items-center gap-2 rounded-xl bg-green-100 px-3 py-2 text-sm font-semibold text-green-900"><CheckBadge className="h-5 w-5" /><span className="truncate">Added: {added}</span></div>}
+
+        {lines.length === 0 && <p className="rounded-xl border-2 border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-500">Parts you add appear here.</p>}
+        <ul className="space-y-2">
+          {lines.map((l, i) => (
+            <li key={l.key} className="anim-up rounded-xl border border-slate-200 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium leading-snug">{l.name}</div>
+                  <div className="text-xs text-slate-400">{l.sku}{l.fixedQty ? ' · from checkout' : ''}</div>
+                </div>
+                <button onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} aria-label={`Remove ${l.name}`} className="-mr-1 -mt-1 h-9 w-9 shrink-0 text-2xl leading-none text-slate-400">×</button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-end gap-2 text-sm">
+                <label className="text-xs text-slate-500">Qty
+                  {l.fixedQty ? <div className="flex h-10 w-14 items-center font-semibold text-slate-800">{l.qty}</div> : <input type="number" min={1} max={l.stock ?? undefined} className="block h-10 w-14 rounded-lg border border-slate-300 px-2 text-base text-slate-900" value={l.qty} onChange={(e) => patch(l.key, { qty: Math.max(1, Math.min(l.stock ?? 9999, Math.floor(Number(e.target.value) || 1))) })} />}
+                </label>
+                <label className="text-xs text-slate-500">Price ₹
+                  <input type="number" min={0} step="0.01" className={`block h-10 w-24 rounded-lg border px-2 text-base text-slate-900 ${l.price > 0 ? 'border-slate-300' : 'border-amber-400 bg-amber-50'}`} value={l.price || ''} placeholder="0" onChange={(e) => patch(l.key, { price: Math.max(0, Number(e.target.value) || 0) })} />
+                </label>
+                {gst && <label className="text-xs text-slate-500">GST %
+                  <input type="number" min={0} max={100} step="0.5" className="block h-10 w-16 rounded-lg border border-slate-300 px-2 text-base text-slate-900" value={l.rate} onChange={(e) => patch(l.key, { rate: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+                </label>}
+                <div className="ml-auto whitespace-nowrap pb-2 font-semibold">{inr(calc[i].total)}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+
         <div className="space-y-1 border-t pt-3 text-sm">
           {gst && <><R l="Taxable value" r={inr(sub)} /><R l="CGST" r={inr(tax / 2)} /><R l="SGST" r={inr(tax / 2)} /></>}
           <div className="flex justify-between pt-1 font-display text-3xl font-bold"><span>Total</span><span>{inr(total)}</span></div>
+          {gst && <p className="text-xs text-slate-500">{incl ? 'Prices include GST; the tax is shown inside the total.' : 'GST is added on top of the prices.'}</p>}
         </div>
         {err && <ErrorNote>{err}</ErrorNote>}
         <button onClick={create} disabled={busy || !lines.length} className="h-14 w-full rounded-xl bg-brand text-lg font-bold text-white active:scale-95 disabled:opacity-50">
@@ -212,6 +250,14 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
         </button>
         <p className="text-xs text-slate-500">Parts added from search reduce stock when the bill is created. A bill cannot be edited afterwards.</p>
       </aside>
+
+      {/* Small screens: the bill is below, so keep a bar in view that shows the count and total. */}
+      {lines.length > 0 && (
+        <button onClick={() => document.getElementById('bill')?.scrollIntoView({ behavior: 'smooth' })} className="anim-up fixed inset-x-3 bottom-3 z-30 flex h-14 items-center justify-between rounded-2xl bg-slate-900 px-5 font-semibold text-white shadow-xl xl:hidden">
+          <span>{lines.length} item{lines.length === 1 ? '' : 's'} on bill</span>
+          <span>{inr(total)} · View bill ↓</span>
+        </button>
+      )}
     </div>
   );
 }
