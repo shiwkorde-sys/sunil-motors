@@ -187,43 +187,22 @@ export default function Sales({ parts }: { parts: Part[] }) {
       {/* ───── Stats as pictures: money over time, billed ring, top sellers, top parts. Hide with the button. ───── */}
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showStats ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="overflow-hidden">
-          <section aria-label="Key numbers" className={`grid grid-cols-1 gap-px overflow-hidden rounded-2xl bg-slate-200 shadow-sm transition-opacity sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] ${loading ? 'opacity-60' : ''}`}>
-            {/* 1. Total sales + bars over time */}
-            <div className="min-w-0 bg-white px-4 py-3">
-              <div className="text-xs font-medium text-slate-500">Total sales</div>
-              <div className="font-display text-3xl font-bold leading-tight text-brand"><CountUp value={k.total} format={rupee} /></div>
-              <div className="truncate text-xs text-slate-500">{plural(shown.length, 'sale')} · {plural(k.units, 'part')} · {plural(k.vehicles, 'vehicle')}</div>
+          <section aria-label="Key numbers" className={`grid grid-cols-1 gap-3 p-1 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${loading ? 'opacity-60' : ''}`}>
+            <StatCard label="Total sales" value={<CountUp value={k.total} format={rupee} />} caption={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')} · ${plural(k.vehicles, 'vehicle')}`}>
               <Bars series={k.series} grow={grow} />
-            </div>
+            </StatCard>
 
-            {/* 2. Billed ring */}
-            <div className="flex min-w-0 items-center gap-3 bg-white px-4 py-3">
-              <Ring pct={k.billedPct} grow={grow} empty={k.total === 0} />
-              <div className="min-w-0 text-sm">
-                <div className="text-xs font-medium text-slate-500">Billed or not</div>
-                <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" /><b className="text-green-700"><CountUp value={k.billed} format={rupee} /></b></div>
-                <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400" /><b className={k.unbilled ? 'text-amber-600' : 'text-slate-400'}><CountUp value={k.unbilled} format={rupee} /></b></div>
-                {k.unpriced > 0 && <div className="text-[11px] text-amber-700">{k.unpriced} without price</div>}
-              </div>
-            </div>
+            <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} caption={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : 'no sales yet'}>
+              <SplitBar billedPct={k.billedPct} unbilledPct={k.unbilledPct} grow={grow} empty={k.total === 0} />
+            </StatCard>
 
-            {/* 3. Top sellers */}
-            <div className="min-w-0 bg-white px-4 py-3">
-              <div className="mb-1.5 text-xs font-medium text-slate-500">Top sellers (₹)</div>
-              {k.mechs.length === 0 && <p className="text-sm text-slate-300">No sales yet</p>}
-              <div className="space-y-1.5">
-                {k.mechs.map((m, i) => <Row key={m.name} name={m.name} text={`${rupee(m.amount)} · ${m.pct}%`} width={(m.amount / (k.mechs[0].amount || 1)) * 100} grow={grow} color={i === 0 ? 'bg-brand' : 'bg-sky-300'} />)}
-              </div>
-            </div>
+            <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} caption={k.mechs[0] ? `${k.mechs[0].pct}% of all sales · top 3 by amount` : 'no sales yet'}>
+              <Ranked items={k.mechs.map((m) => ({ name: m.name, text: rupee(m.amount), value: m.amount }))} grow={grow} />
+            </StatCard>
 
-            {/* 4. Most sold parts */}
-            <div className="min-w-0 bg-white px-4 py-3">
-              <div className="mb-1.5 text-xs font-medium text-slate-500">Most sold parts</div>
-              {k.topParts.length === 0 && <p className="text-sm text-slate-300">No sales yet</p>}
-              <div className="space-y-1.5">
-                {k.topParts.map((x, i) => <Row key={x.name} name={x.name} text={`${x.qty} sold`} width={(x.qty / (k.topParts[0].qty || 1)) * 100} grow={grow} color={i === 0 ? 'bg-brand' : 'bg-sky-300'} />)}
-              </div>
-            </div>
+            <StatCard label="Most sold part" value={k.topParts[0] ? <><CountUp value={k.topParts[0].qty} /> <span className="text-base font-medium text-slate-500">sold</span></> : '–'} caption={k.topParts[0] ? 'Top 3 by pieces sold' : 'no sales yet'}>
+              <Ranked items={k.topParts.map((x) => ({ name: x.name, text: String(x.qty), value: x.qty }))} grow={grow} />
+            </StatCard>
           </section>
         </div>
       </div>
@@ -283,49 +262,67 @@ export default function Sales({ parts }: { parts: Part[] }) {
   );
 }
 
-/** Little bar chart: money by hour / day / month. Tap or hover a bar to read it. */
+const VISUAL = 'h-[4.75rem]'; // every card's picture is the same height, so the four cards line up
+
+/** Same shape for every stat: label, one big number, a picture, one line of detail. */
+function StatCard({ label, value, caption, children }: { label: string; value: React.ReactNode; caption: string; children: React.ReactNode }) {
+  return (
+    <div className="anim-up flex min-w-0 flex-col gap-2 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="font-display text-3xl font-bold leading-none">{value}</div>
+      <div className={VISUAL}>{children}</div>
+      <div className="truncate text-xs text-slate-500" title={caption}>{caption}</div>
+    </div>
+  );
+}
+
+/** Money by hour / day / month as small bars. The best one is dark. Hover or tap a bar to read it. */
 function Bars({ series, grow }: { series: { key: string; label: string; amount: number }[]; grow: boolean }) {
-  if (series.length === 0) return <div className="mt-2 h-10" />;
+  if (series.length === 0) return <Empty />;
   const max = Math.max(...series.map((b) => b.amount), 1);
   const peak = series.reduce((a, b) => (b.amount > a.amount ? b : a));
   return (
-    <div className="mt-2">
-      <div className="flex h-10 items-end gap-[3px]" role="img" aria-label={`Sales over time. Best: ${peak.label}, ${rupee(peak.amount)}`}>
-        {series.map((b) => (
-          <div key={b.key} title={`${b.label}: ${rupee(b.amount)}`} className="flex h-full min-w-[3px] flex-1 items-end">
-            <div className={`w-full rounded-t-[3px] transition-[height] duration-700 ease-out ${b === peak ? 'bg-brand' : 'bg-sky-200'}`} style={{ height: grow ? `${Math.max(b.amount / max, b.amount > 0 ? 0.08 : 0.02) * 100}%` : '0%' }} />
-          </div>
-        ))}
-      </div>
-      <div className="mt-0.5 flex justify-between text-[10px] text-slate-400"><span>{series[0].label}</span><span>Best: {peak.label}</span><span>{series[series.length - 1].label}</span></div>
+    <div className="flex h-full items-end gap-[3px]" role="img" aria-label={`Sales over time. Best: ${peak.label}, ${rupee(peak.amount)}`}>
+      {series.map((b) => (
+        <div key={b.key} title={`${b.label}: ${rupee(b.amount)}`} className="flex h-full min-w-[3px] max-w-[28px] flex-1 items-end">
+          <div className={`w-full rounded-t-[3px] transition-[height] duration-700 ease-out ${b === peak ? 'bg-brand' : 'bg-sky-200'}`} style={{ height: grow ? `${Math.max(b.amount / max, b.amount > 0 ? 0.08 : 0.02) * 100}%` : '0%' }} />
+        </div>
+      ))}
     </div>
   );
 }
 
-/** Ring that fills to the billed share. */
-function Ring({ pct, grow, empty }: { pct: number; grow: boolean; empty: boolean }) {
-  const r = 26;
-  const c = 2 * Math.PI * r;
+/** One bar split into billed (green) and not billed (amber), with the shares written under it. */
+function SplitBar({ billedPct, unbilledPct, grow, empty }: { billedPct: number; unbilledPct: number; grow: boolean; empty: boolean }) {
+  if (empty) return <Empty />;
   return (
-    <div className="relative h-16 w-16 shrink-0" role="img" aria-label={`${pct}% of sales are billed`}>
-      <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
-        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="8" className={empty ? 'stroke-slate-100' : 'stroke-amber-400'} />
-        {!empty && <circle cx="32" cy="32" r={r} fill="none" strokeWidth="8" strokeLinecap="butt" className="stroke-green-500 transition-[stroke-dashoffset] duration-700 ease-out" strokeDasharray={c} strokeDashoffset={grow ? c * (1 - pct / 100) : c} />}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-        <span className="font-display text-lg font-bold">{empty ? '–' : pct + '%'}</span>
-        <span className="text-[9px] text-slate-400">billed</span>
+    <div className="flex h-full flex-col justify-end gap-2" role="img" aria-label={`${billedPct}% billed, ${unbilledPct}% not billed`}>
+      <div className="flex h-8 overflow-hidden rounded-lg bg-slate-100">
+        <div className="h-full bg-green-500 transition-[width] duration-700 ease-out" style={{ width: grow ? `${billedPct}%` : '0%' }} />
+        <div className="h-full bg-amber-400 transition-[width] duration-700 ease-out" style={{ width: grow ? `${unbilledPct}%` : '0%' }} />
+      </div>
+      <div className="flex justify-between text-xs text-slate-600">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-green-500" />Billed {billedPct}%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" />Not billed {unbilledPct}%</span>
       </div>
     </div>
   );
 }
 
-/** One ranked line: name, a bar, and its figure. */
-function Row({ name, text, width, grow, color }: { name: string; text: string; width: number; grow: boolean; color: string }) {
+/** Up to three ranked lines: a bar behind the name, the figure on the right. */
+function Ranked({ items, grow }: { items: { name: string; text: string; value: number }[]; grow: boolean }) {
+  if (items.length === 0) return <Empty />;
+  const max = items[0].value || 1;
   return (
-    <div title={`${name}: ${text}`}>
-      <div className="flex items-baseline justify-between gap-2 text-xs"><span className="truncate font-medium text-slate-700">{name}</span><span className="shrink-0 text-slate-500">{text}</span></div>
-      <div className="mt-0.5 h-1.5 rounded-full bg-slate-100"><div className={`h-full rounded-full transition-[width] duration-700 ease-out ${color}`} style={{ width: grow ? `${Math.max(width, 4)}%` : '0%' }} /></div>
+    <div className="flex h-full flex-col justify-end gap-1.5">
+      {items.map((it, i) => (
+        <div key={it.name} title={`${it.name}: ${it.text}`} className="relative h-5 overflow-hidden rounded-md bg-slate-100">
+          <div className={`absolute inset-y-0 left-0 rounded-md transition-[width] duration-700 ease-out ${i === 0 ? 'bg-sky-300' : 'bg-sky-200'}`} style={{ width: grow ? `${Math.max((it.value / max) * 100, 6)}%` : '0%' }} />
+          <div className="relative flex h-full items-center justify-between gap-2 px-2 text-xs"><span className="truncate font-medium text-slate-800">{it.name}</span><span className="shrink-0 text-slate-600">{it.text}</span></div>
+        </div>
+      ))}
     </div>
   );
 }
+
+const Empty = () => <div className="flex h-full items-center justify-center rounded-lg bg-slate-50 text-xs text-slate-300">Nothing to show yet</div>;
