@@ -1,21 +1,35 @@
 import { useEffect, useMemo, useState } from 'react';
 import { downloadCsv } from '../lib/csv';
 import { supabase } from '../lib/supabase';
-import type { Checkout } from '../lib/types';
-import type { Part } from '../lib/types';
+import type { Checkout, Part } from '../lib/types';
 import DateRangePicker, { type DateRange } from './DateRangePicker';
+import { CountUp, stagger } from './motion';
 import { ErrorNote, inputCls } from './ui';
 
-const ymd = (d: Date) => d.toLocaleDateString('en-CA'); // yyyy-mm-dd, local (India) day
+const ymd = (d: Date) => d.toLocaleDateString('en-CA');
 const startOf = (s: string) => new Date(s + 'T00:00:00');
-const inr0 = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const rupee = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+const rupee2 = (n: number) => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const plural = (n: number, one: string, many = one + 's') => `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`;
+const shortName = (s: string) => s.replace(/\s*\(.*?\)\s*/g, ' ').trim();
 
-/** Every part that left the shop (mechanic checkouts and counter sales). Read-only history. */
+interface Billed {
+  no: string;
+  unit: number;
+  amount: number;
+}
+interface Sale extends Checkout {
+  billed: Billed | null;
+  unit: number; // price per piece: the billed price, or today's list price if there is no bill
+  amount: number; // quantity x price
+}
+
+/** Every part that left the shop (mechanic checkouts and counter sales) with what it is worth. Read-only. */
 export default function Sales({ parts }: { parts: Part[] }) {
   const [range, setRange] = useState<DateRange>({ from: ymd(new Date()), to: ymd(new Date()) });
   const [text, setText] = useState('');
   const [rows, setRows] = useState<Checkout[]>([]);
-  const [bills, setBills] = useState<Record<string, { no: string; amount: number }>>({});
+  const [bills, setBills] = useState<Record<string, Billed>>({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -38,12 +52,13 @@ export default function Sales({ parts }: { parts: Part[] }) {
       }
       const list = data as Checkout[];
       setRows(list);
-      // Which of these are already on a bill? (Only admins can read bills; this screen is admin-only.)
       const ids = list.map((r) => r.id);
-      const map: Record<string, { no: string; amount: number }> = {};
+      const map: Record<string, Billed> = {};
       for (let i = 0; i < ids.length; i += 150) {
-        const { data: its } = await supabase.from('invoice_items').select('checkout_id, line_total, invoices(invoice_number)').in('checkout_id', ids.slice(i, i + 150));
-        (its as unknown as { checkout_id: string; line_total: string; invoices: { invoice_number: string } | null }[] | null)?.forEach((x) => x.invoices && (map[x.checkout_id] = { no: x.invoices.invoice_number, amount: Number(x.line_total) }));
+        const { data: its } = await supabase.from('invoice_items').select('checkout_id, unit_price, line_total, invoices(invoice_number)').in('checkout_id', ids.slice(i, i + 150));
+        (its as unknown as { checkout_id: string; unit_price: string; line_total: string; invoices: { invoice_number: string } | null }[] | null)?.forEach(
+          (x) => x.invoices && (map[x.checkout_id] = { no: x.invoices.invoice_number, unit: Number(x.unit_price), amount: Number(x.line_total) }),
+        );
       }
       if (alive) {
         setBills(map);
@@ -55,109 +70,166 @@ export default function Sales({ parts }: { parts: Part[] }) {
     };
   }, [range]);
 
+  const listPrice = useMemo(() => new Map(parts.map((p) => [p.id, p.price ?? 0])), [parts]);
+
+  const sales: Sale[] = useMemo(
+    () =>
+      rows.map((r) => {
+        const billed = bills[r.id] ?? null;
+        const unit = billed ? billed.unit : listPrice.get(r.part_id) ?? 0;
+        return { ...r, billed, unit, amount: billed ? billed.amount : unit * r.quantity };
+      }),
+    [rows, bills, listPrice],
+  );
+
   const shown = useMemo(() => {
     const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) return rows;
-    return rows.filter((r) => {
-      const hay = [r.part_name, r.sku, r.vehicle_registration, r.mechanic_name, r.job_reference].join(' ').toLowerCase().replace(/\s+/g, ' ');
-      const hayNoSpace = hay.replace(/ /g, '');
-      return words.every((w) => hay.includes(w) || hayNoSpace.includes(w)); // "mh12ab" also matches "MH 12 AB 1234"
+    if (!words.length) return sales;
+    return sales.filter((r) => {
+      const hay = [r.part_name, r.sku, r.vehicle_registration, r.mechanic_name, r.job_reference, r.billed?.no].join(' ').toLowerCase();
+      const flat = hay.replace(/\s+/g, '');
+      return words.every((w) => hay.includes(w) || flat.includes(w)); // "mh12ab" also finds "MH 12 AB 1234"
     });
-  }, [rows, text]);
+  }, [sales, text]);
 
-  const units = shown.reduce((n, r) => n + r.quantity, 0);
-  const byId = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts]);
-  const price = useMemo(() => new Map(parts.map((p) => [p.id, p.price ?? 0])), [parts]);
   const k = useMemo(() => {
-    const billed = shown.filter((r) => bills[r.id]);
-    const unbilled = shown.filter((r) => !bills[r.id]);
-    const top = (key: (r: Checkout) => string, weight: (r: Checkout) => number) => {
-      const m = new Map<string, number>();
-      shown.forEach((r) => m.set(key(r), (m.get(key(r)) ?? 0) + weight(r)));
-      return [...m.entries()].sort((a, b) => b[1] - a[1])[0];
-    };
+    const total = shown.reduce((n, r) => n + r.amount, 0);
+    const billed = shown.filter((r) => r.billed).reduce((n, r) => n + r.amount, 0);
+    const unbilled = total - billed;
+    const units = shown.reduce((n, r) => n + r.quantity, 0);
+    const vehicles = new Set(shown.map((r) => r.vehicle_registration).filter(Boolean)).size;
+
+    const mech = new Map<string, { amount: number; sales: number; units: number; vehicles: Set<string> }>();
+    const part = new Map<string, number>();
+    const sold = new Map<string, number>();
+    shown.forEach((r) => {
+      const m = mech.get(r.mechanic_name) ?? { amount: 0, sales: 0, units: 0, vehicles: new Set<string>() };
+      m.amount += r.amount;
+      m.sales += 1;
+      m.units += r.quantity;
+      if (r.vehicle_registration) m.vehicles.add(r.vehicle_registration);
+      mech.set(r.mechanic_name, m);
+      part.set(r.part_name, (part.get(r.part_name) ?? 0) + r.quantity);
+      sold.set(r.part_id, (sold.get(r.part_id) ?? 0) + r.quantity);
+    });
+    const mechs = [...mech.entries()].sort((a, b) => b[1].amount - a[1].amount || b[1].sales - a[1].sales).slice(0, 3).map(([name, m]) => ({ name, vehicles: m.vehicles.size, amount: m.amount, pct: total > 0 ? Math.round((m.amount / total) * 100) : 0 }));
+    const topParts = [...part.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, qty]) => ({ name: shortName(name), qty }));
+
+    const billedPct = total > 0 ? Math.round((billed / total) * 100) : 0;
     return {
-      revenue: billed.reduce((n, r) => n + bills[r.id].amount, 0),
-      billed: billed.length,
-      unbilled: unbilled.length,
-      unbilledValue: unbilled.reduce((n, r) => n + r.quantity * (price.get(r.part_id) ?? 0), 0),
-      topPart: top((r) => r.part_name, (r) => r.quantity),
-      topMechanic: top((r) => r.mechanic_name, () => 1),
-      // parts that sold in this filter and are now at or below their minimum stock (best sellers first)
-      restock: (() => {
-        const sold = new Map<string, number>();
-        shown.forEach((r) => sold.set(r.part_id, (sold.get(r.part_id) ?? 0) + r.quantity));
-        return [...sold.entries()]
-          .map(([id, n]) => ({ part: byId.get(id), n }))
-          .filter((x): x is { part: Part; n: number } => !!x.part && x.part.quantity_available <= x.part.min_stock)
-          .sort((a, b) => b.n - a.n);
-      })(),
-      vehicles: new Set(shown.map((r) => r.vehicle_registration).filter(Boolean)).size,
+      total, billed, unbilled, units, vehicles, billedPct, unbilledPct: total > 0 ? 100 - billedPct : 0,
+      unpriced: shown.filter((r) => !r.billed && r.unit === 0).length,
+      mechs, topParts,
     };
-  }, [shown, bills, price, byId]);
+  }, [shown]);
+
+  const [showStats, setShowStats] = useState(() => {
+    try {
+      return localStorage.getItem('sales-stats') !== 'hidden';
+    } catch {
+      return true;
+    }
+  });
+  const toggleStats = () =>
+    setShowStats((v) => {
+      try {
+        localStorage.setItem('sales-stats', v ? 'hidden' : 'shown');
+      } catch {
+        /* private mode: fine, it just will not be remembered */
+      }
+      return !v;
+    });
+  const empty = !loading && shown.length === 0;
 
   return (
-    <>
-      <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <DateRangePicker value={range} onChange={setRange} />
-          <input className={inputCls + ' min-w-0 flex-1 sm:min-w-[18rem]'} placeholder="Search part, SKU, vehicle number, mechanic or job…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search sales" />
-        </div>
-      </div>
-
-      <section aria-label="Key numbers for this filter" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Billed revenue" value={inr0(k.revenue)} note={`${k.billed} billed sale${k.billed === 1 ? '' : 's'}`} tone="brand" />
-        <Kpi label="Sales" value={String(shown.length)} note={`${units} part${units === 1 ? '' : 's'} sold`} />
-        <Kpi label="Not billed yet" value={String(k.unbilled)} note={k.unbilled ? `about ${inr0(k.unbilledValue)} at list price` : 'all sales are billed'} tone={k.unbilled ? 'warn' : 'ok'} />
-        <Kpi label="Top part" value={k.topPart ? k.topPart[0] : '-'} note={k.topPart ? `${k.topPart[1]} sold` : ''} small />
-        <Kpi label="Busiest mechanic" value={k.topMechanic ? k.topMechanic[0] : '-'} note={k.topMechanic ? `${k.topMechanic[1]} sale${k.topMechanic[1] === 1 ? '' : 's'}` : ''} small />
-        <Kpi label="Restock soon" value={String(k.restock.length)} tone={k.restock.length ? 'warn' : 'ok'} note={k.restock.length ? k.restock.slice(0, 2).map((x) => `${x.part.name.replace(/\s*\(.*?\)\s*/g, ' ').trim()} (${x.part.quantity_available} left)`).join(', ') + (k.restock.length > 2 ? ` +${k.restock.length - 2} more` : '') : 'sold parts are well stocked'} />
-        <Kpi label="Vehicles served" value={String(k.vehicles)} note="different vehicle numbers" />
-      </section>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500" aria-live="polite">
-          {loading ? 'Loading…' : `Showing ${shown.length} of ${rows.length}`}
-          {rows.length >= 1000 && ' · showing the latest 1,000, narrow the dates to see others'}
-          <span className="ml-2">Read-only history. Entries cannot be edited or deleted.</span>
-        </p>
-        <button onClick={() => downloadCsv('sales.csv', shown.map((r) => ({ ...r, bill: bills[r.id]?.no ?? '' })))} disabled={!shown.length} className="rounded-xl bg-white px-4 py-2 font-semibold shadow-sm disabled:opacity-50">
-          Export CSV
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
+        <DateRangePicker value={range} onChange={setRange} />
+        <input className={inputCls + ' min-w-0 flex-1 sm:min-w-[18rem]'} placeholder="Find a vehicle, mechanic, part or bill…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search sales" />
+        <button onClick={toggleStats} aria-expanded={showStats} className="h-11 shrink-0 rounded-xl bg-slate-100 px-4 text-sm font-semibold hover:bg-slate-200 active:scale-95">
+          {showStats ? 'Hide stats' : 'Show stats'}
         </button>
       </div>
       {err && <ErrorNote>{err}</ErrorNote>}
+
+      {/* ───── Stats as pictures: money over time, billed ring, top sellers, top parts. Hide with the button. ───── */}
+      <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showStats ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          <section aria-label="Key numbers" className={`grid grid-cols-1 gap-3 p-1 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${loading ? 'opacity-60' : ''}`}>
+            <StatCard label="Total sales" value={<CountUp value={k.total} format={rupee} />} line={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')}`} note={plural(k.vehicles, 'vehicle')} />
+
+            <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} line={k.total ? `${k.billedPct}% of sales` : 'no sales yet'} note={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : ''} />
+
+            <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} line={k.mechs[0]?.name ?? 'no sales yet'} note={k.mechs[0] ? `${k.mechs[0].pct}% of sales · ${plural(k.mechs[0].vehicles, 'vehicle')}` : ''} />
+
+            <StatCard label="Most sold part" value={k.topParts[0] ? <><CountUp value={k.topParts[0].qty} /> <span className="text-base font-medium text-slate-500">sold</span></> : '–'} line={k.topParts[0]?.name ?? 'no sales yet'} note={k.topParts[0] && k.units ? `${Math.round((k.topParts[0].qty / k.units) * 100)}% of parts sold` : ''} />
+          </section>
+        </div>
+      </div>
+      {!showStats && (
+        <p className="px-1 text-sm text-slate-500">
+          <b className="text-slate-800"><CountUp value={k.total} format={rupee} /></b> total · {plural(shown.length, 'sale')} · {k.unbilledPct}% not billed
+        </p>
+      )}
+
+      {/* ───── The list ───── */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-500" aria-live="polite">
+          {loading ? 'Loading sales…' : `${plural(shown.length, 'sale')} shown`}
+          {rows.length >= 1000 && ' (latest 1,000. Choose fewer days to see the rest.)'}
+          <span className="ml-2 text-slate-400">History is read-only.</span>
+        </p>
+        <button
+          onClick={() => downloadCsv('sales.csv', shown.map((r) => ({ vehicle: r.vehicle_registration ?? '', mechanic: r.mechanic_name, date: new Date(r.created_at).toLocaleString('en-IN'), part: r.part_name, sku: r.sku, quantity: r.quantity, price: r.unit, amount: r.amount, bill: r.billed?.no ?? '', job: r.job_reference })))}
+          disabled={!shown.length}
+          className="h-10 rounded-xl bg-white px-4 text-sm font-semibold shadow-sm active:scale-95 disabled:opacity-50"
+        >
+          Download as spreadsheet
+        </button>
+      </div>
+
       <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>{['When', 'Part', 'Qty', 'Mechanic', 'Vehicle', 'Job ref', 'Bill'].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
+          <thead>
+            <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
+              {['Vehicle', 'Mechanic', 'When', 'Part', 'Qty', 'Price', 'Amount', 'Bill'].map((h, i) => <th key={h} className={`px-3 py-2 font-semibold ${i >= 4 && i <= 6 ? 'text-right' : ''}`}>{h}</th>)}
+            </tr>
           </thead>
-          <tbody className="divide-y">
-            {!loading && shown.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No sales for this choice.</td></tr>}
-            {shown.map((r) => (
-              <tr key={r.id}>
-                <td className="whitespace-nowrap px-4 py-2">{new Date(r.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                <td className="px-4 py-2">{r.part_name} <span className="text-xs text-slate-400">{r.sku}</span></td>
-                <td className="px-4 py-2">{r.quantity}</td>
-                <td className="px-4 py-2">{r.mechanic_name}</td>
-                <td className="px-4 py-2 font-mono">{r.vehicle_registration ?? '-'}</td>
-                <td className="px-4 py-2">{r.job_reference}</td>
-                <td className="px-4 py-2">{bills[r.id] ? <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">{bills[r.id].no}</span> : <span className="text-xs text-slate-400">Not billed</span>}</td>
+          <tbody className="divide-y divide-slate-50">
+            {empty && (
+              <tr><td colSpan={8} className="px-4 py-14 text-center text-slate-500">
+                <div className="font-semibold text-slate-700">No sales here</div>
+                <div className="text-sm">Try another period, or clear the search.</div>
+              </td></tr>
+            )}
+            {shown.map((r, i) => (
+              <tr key={r.id} className="anim-up hover:bg-slate-50/70" style={stagger(Math.min(i, 5))}>
+                <td className="whitespace-nowrap px-3 py-2 font-mono font-semibold">{r.vehicle_registration ?? <span className="font-sans font-normal text-slate-300">none</span>}</td>
+                <td className="whitespace-nowrap px-3 py-2">{r.mechanic_name}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-slate-500">{new Date(r.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
+                <td className="px-3 py-2">{r.part_name}<div className="text-xs text-slate-400">{r.sku}</div></td>
+                <td className="px-3 py-2 text-right">{r.quantity}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-right text-slate-600">{r.unit ? rupee2(r.unit) : <span className="text-amber-600">no price</span>}{!r.billed && r.unit > 0 && <span title="List price today, because there is no bill" className="ml-0.5 text-slate-300">*</span>}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">{rupee2(r.amount)}</td>
+                <td className="whitespace-nowrap px-3 py-2">{r.billed ? <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">{r.billed.no}</span> : <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">No bill</span>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </>
+      <p className="text-xs text-slate-400">* No bill was made, so the price shown is today's list price. Billed sales show the price actually charged, with GST if it was added.</p>
+    </div>
   );
 }
 
-function Kpi({ label, value, note, tone, small = false }: { label: string; value: string; note?: string; tone?: 'brand' | 'warn' | 'ok'; small?: boolean }) {
-  const color = tone === 'brand' ? 'text-brand' : tone === 'warn' ? 'text-amber-700' : tone === 'ok' ? 'text-green-700' : 'text-slate-900';
+/** Same shape for every stat: label, one big number, a name, one small note. */
+function StatCard({ label, value, line, note }: { label: string; value: React.ReactNode; line: string; note: string }) {
   return (
     <div className="anim-up min-w-0 rounded-2xl bg-white p-4 shadow-sm">
-      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className={`mt-1 font-display font-bold leading-tight ${color} ${small ? 'line-clamp-2 text-xl' : 'text-3xl'}`} title={value}>{value}</div>
-      {note && <div className="mt-0.5 text-xs text-slate-500">{note}</div>}
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="font-display text-3xl font-bold leading-tight">{value}</div>
+      <div className="line-clamp-2 text-sm font-medium text-slate-700" title={line}>{line}</div>
+      <div className="line-clamp-2 text-xs text-slate-500" title={note}>{note || '\u00a0'}</div>
     </div>
   );
 }
