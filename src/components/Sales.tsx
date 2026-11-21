@@ -115,38 +115,13 @@ export default function Sales({ parts }: { parts: Part[] }) {
     const mechs = [...mech.entries()].sort((a, b) => b[1].amount - a[1].amount || b[1].sales - a[1].sales).slice(0, 3).map(([name, m]) => ({ name, vehicles: m.vehicles.size, amount: m.amount, pct: total > 0 ? Math.round((m.amount / total) * 100) : 0 }));
     const topParts = [...part.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, qty]) => ({ name: shortName(name), qty }));
 
-    // Money over time: by hour for one day, by day up to ~6 weeks, otherwise by month.
-    const oneDay = !!range.from && range.from === range.to;
-    const times = shown.map((r) => new Date(r.created_at).getTime());
-    const first = range.from ? startOf(range.from).getTime() : Math.min(...times);
-    const last = range.to ? startOf(range.to).getTime() : Math.max(...times);
-    const days = Math.round((last - first) / 86400000) + 1;
-    const mode: 'hour' | 'day' | 'month' = oneDay ? 'hour' : days <= 45 ? 'day' : 'month';
-    const keyOf = (t: number) => {
-      const d = new Date(t);
-      return mode === 'hour' ? String(d.getHours()) : mode === 'day' ? ymd(d) : ymd(d).slice(0, 7);
-    };
-    const sum = new Map<string, number>();
-    shown.forEach((r) => sum.set(keyOf(new Date(r.created_at).getTime()), (sum.get(keyOf(new Date(r.created_at).getTime())) ?? 0) + r.amount));
-    const series: { key: string; label: string; amount: number }[] = [];
-    if (shown.length) {
-      if (mode === 'hour') {
-        const hrs = [...sum.keys()].map(Number);
-        for (let h = Math.min(...hrs); h <= Math.max(...hrs); h++) series.push({ key: String(h), label: new Date(2000, 0, 1, h).toLocaleTimeString('en-IN', { hour: 'numeric' }), amount: sum.get(String(h)) ?? 0 });
-      } else if (mode === 'day') {
-        for (let t = first; t <= last; t += 86400000) series.push({ key: ymd(new Date(t)), label: new Date(t).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), amount: sum.get(ymd(new Date(t))) ?? 0 });
-      } else {
-        const ms = [...sum.keys()].sort();
-        ms.forEach((m) => series.push({ key: m, label: new Date(m + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }), amount: sum.get(m) ?? 0 }));
-      }
-    }
     const billedPct = total > 0 ? Math.round((billed / total) * 100) : 0;
     return {
       total, billed, unbilled, units, vehicles, billedPct, unbilledPct: total > 0 ? 100 - billedPct : 0,
       unpriced: shown.filter((r) => !r.billed && r.unit === 0).length,
-      mechs, topParts, series, mode,
+      mechs, topParts,
     };
-  }, [shown, range]);
+  }, [shown]);
 
   const [showStats, setShowStats] = useState(() => {
     try {
@@ -164,13 +139,6 @@ export default function Sales({ parts }: { parts: Part[] }) {
       }
       return !v;
     });
-  const [grow, setGrow] = useState(false);
-  useEffect(() => {
-    setGrow(false);
-    const t = requestAnimationFrame(() => setGrow(true));
-    return () => cancelAnimationFrame(t);
-  }, [k.billedPct, loading]);
-
   const empty = !loading && shown.length === 0;
 
   return (
@@ -188,9 +156,9 @@ export default function Sales({ parts }: { parts: Part[] }) {
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showStats ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="overflow-hidden">
           <section aria-label="Key numbers" className={`grid grid-cols-1 gap-3 p-1 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${loading ? 'opacity-60' : ''}`}>
-            <StatCard label="Total sales" value={<CountUp value={k.total} format={rupee} />} line={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')}`} note={plural(k.vehicles, 'vehicle')} visual={k.series.length >= 3 ? <Bars series={k.series} grow={grow} /> : undefined} />
+            <StatCard label="Total sales" value={<CountUp value={k.total} format={rupee} />} line={`${plural(shown.length, 'sale')} · ${plural(k.units, 'part')}`} note={plural(k.vehicles, 'vehicle')} />
 
-            <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} line={k.total ? `${k.billedPct}% of sales` : 'no sales yet'} note={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : ''} visual={k.total ? <BilledRing pct={k.billedPct} grow={grow} /> : undefined} />
+            <StatCard label="Billed" value={<CountUp value={k.billed} format={rupee} />} line={k.total ? `${k.billedPct}% of sales` : 'no sales yet'} note={k.total ? `${rupee(k.unbilled)} not billed${k.unpriced ? ` · ${k.unpriced} without price` : ''}` : ''} />
 
             <StatCard label="Top seller" value={k.mechs[0] ? <CountUp value={k.mechs[0].amount} format={rupee} /> : '–'} line={k.mechs[0]?.name ?? 'no sales yet'} note={k.mechs[0] ? `${k.mechs[0].pct}% of sales · ${plural(k.mechs[0].vehicles, 'vehicle')}` : ''} />
 
@@ -254,47 +222,14 @@ export default function Sales({ parts }: { parts: Part[] }) {
   );
 }
 
-/** Same shape for every stat: label, one big number, a name, one small note. A picture is added only where it helps. */
-function StatCard({ label, value, line, note, visual }: { label: string; value: React.ReactNode; line: string; note: string; visual?: React.ReactNode }) {
+/** Same shape for every stat: label, one big number, a name, one small note. */
+function StatCard({ label, value, line, note }: { label: string; value: React.ReactNode; line: string; note: string }) {
   return (
-    <div className="anim-up flex min-w-0 items-start justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm">
-      <div className="min-w-0">
-        <div className="text-xs font-medium text-slate-500">{label}</div>
-        <div className="font-display text-3xl font-bold leading-tight">{value}</div>
-        <div className="line-clamp-2 text-sm font-medium text-slate-700" title={line}>{line}</div>
-        <div className="line-clamp-2 text-xs text-slate-500" title={note}>{note || '\u00a0'}</div>
-      </div>
-      {visual && <div className="mt-1 h-14 w-16 shrink-0">{visual}</div>}
-    </div>
-  );
-}
-
-/** Money by hour / day / month as small bars. The best one is dark. Hover or tap a bar to read it. */
-function Bars({ series, grow }: { series: { key: string; label: string; amount: number }[]; grow: boolean }) {
-  const max = Math.max(...series.map((b) => b.amount), 1);
-  const peak = series.reduce((a, b) => (b.amount > a.amount ? b : a));
-  return (
-    <div className="flex h-full items-end gap-[3px]" role="img" aria-label={`Sales over time. Best: ${peak.label}, ${rupee(peak.amount)}`}>
-      {series.map((b) => (
-        <div key={b.key} title={`${b.label}: ${rupee(b.amount)}`} className="flex h-full min-w-[3px] max-w-[28px] flex-1 items-end">
-          <div className={`w-full rounded-t-[3px] transition-[height] duration-700 ease-out ${b === peak ? 'bg-brand' : 'bg-sky-200'}`} style={{ height: grow ? `${Math.max(b.amount / max, b.amount > 0 ? 0.08 : 0.02) * 100}%` : '0%' }} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Small ring: how much of the money is billed. */
-function BilledRing({ pct, grow }: { pct: number; grow: boolean }) {
-  const r = 24;
-  const c = 2 * Math.PI * r;
-  return (
-    <div className="relative mx-auto h-14 w-14" role="img" aria-label={`${pct}% billed`}>
-      <svg viewBox="0 0 60 60" className="h-full w-full -rotate-90">
-        <circle cx="30" cy="30" r={r} fill="none" stroke="#fbbf24" strokeWidth="9" />
-        <circle cx="30" cy="30" r={r} fill="none" stroke="#22c55e" strokeWidth="9" strokeDasharray={c} strokeDashoffset={grow ? c * (1 - pct / 100) : c} className="transition-[stroke-dashoffset] duration-700 ease-out" />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center font-display text-sm font-bold">{pct}%</div>
+    <div className="anim-up min-w-0 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="font-display text-3xl font-bold leading-tight">{value}</div>
+      <div className="line-clamp-2 text-sm font-medium text-slate-700" title={line}>{line}</div>
+      <div className="line-clamp-2 text-xs text-slate-500" title={note}>{note || '\u00a0'}</div>
     </div>
   );
 }
