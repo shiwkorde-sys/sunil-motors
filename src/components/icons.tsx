@@ -24,10 +24,10 @@ export const MicIcon = ({ className = '' }: P) => (
   </svg>
 );
 
-export const SpeakerIcon = ({ className = '' }: P) => (
+export const SpeakerIcon = ({ className = '', off = false }: P & { off?: boolean }) => (
   <svg {...base} className={className}>
     <path d="M11 5 6 9H3v6h3l5 4z" />
-    <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12" />
+    {off ? <path d="m16 9 5 6m0-6-5 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12" />}
   </svg>
 );
 

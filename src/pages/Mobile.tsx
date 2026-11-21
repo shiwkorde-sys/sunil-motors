@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { setLang, useLang } from '../lib/lang';
+import { setMuted, useMuted } from '../lib/mute';
 import { emptyQuery, isSearching, searchParts, type Query } from '../lib/search';
 import { useParts } from '../lib/useParts';
 import { CheckBadge, stagger } from '../components/motion';
 import PartDetail from '../components/PartDetail';
 import SearchPanel from '../components/SearchPanel';
-import { ArrowLeft, ChevronRight, PinIcon } from '../components/icons';
+import { ArrowLeft, ChevronRight, GearIcon, PinIcon, SpeakerIcon } from '../components/icons';
 import { ConfigWarning, ErrorNote, PartImage, StockBadge } from '../components/ui';
 
 const EXAMPLES = ['Splendor clutch plate', 'Activa belt', 'Pulsar rear brake'];
@@ -16,29 +17,39 @@ const EXAMPLES_HI = ['स्प्लेंडर क्लच प्लेट',
 function Header({ back }: { back?: boolean }) {
   const { isAdmin, signOut, profile } = useAuth();
   const lang = useLang();
+  const muted = useMuted();
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between bg-brand px-4 py-2.5 text-white">
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-brand px-4 py-2.5 text-white">
       {back ? (
         <Link to="/m" className="flex h-11 items-center gap-1 pr-3 text-base font-bold">
           <ArrowLeft className="h-5 w-5" /> Back
         </Link>
       ) : (
-        <span className="whitespace-nowrap font-display text-xl font-bold uppercase tracking-wide">Sunil Motors</span>
+        <span className="whitespace-nowrap font-display text-base font-bold uppercase tracking-normal">Sunil Motors</span>
       )}
-      <div className="flex items-center gap-1.5 text-sm">
+      <div className="flex items-center gap-1 text-sm">
         <div className="flex overflow-hidden rounded-lg bg-white/20" role="group" aria-label="Audio language">
           {(['hi', 'en'] as const).map((l) => (
-            <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l} className={`h-10 px-2.5 ${lang === l ? 'bg-white font-bold text-brand' : ''}`}>
+            <button key={l} onClick={() => setLang(l)} aria-pressed={lang === l} className={`h-10 px-1.5 ${lang === l ? 'bg-white font-bold text-brand' : ''}`}>
               {l === 'hi' ? 'हिन्दी' : 'EN'}
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setMuted(!muted)}
+          aria-pressed={muted}
+          aria-label={muted ? 'Turn sound on' : 'Mute sound'}
+          title={muted ? 'Turn sound on' : 'Mute sound'}
+          className={`flex h-10 w-10 items-center justify-center rounded-lg ${muted ? 'bg-white text-brand' : 'bg-white/20'}`}
+        >
+          <SpeakerIcon className="h-5 w-5" off={muted} />
+        </button>
         {isAdmin && (
-          <Link to="/dashboard" className="flex h-10 items-center px-1 underline">
-            Admin
+          <Link to="/dashboard" aria-label="Admin dashboard" title="Admin" className="hidden h-10 w-10 items-center min-[400px]:flex justify-center rounded-lg bg-white/20">
+            <GearIcon className="h-5 w-5" />
           </Link>
         )}
-        <button onClick={signOut} className="h-10 whitespace-nowrap rounded-lg bg-white/20 px-2.5" title={profile?.email ?? ''}>
+        <button onClick={signOut} className="h-10 whitespace-nowrap rounded-lg bg-white/20 px-2" title={profile?.email ?? ''}>
           Sign out
         </button>
       </div>
