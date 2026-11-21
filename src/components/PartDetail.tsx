@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getLang, useLang } from '../lib/lang';
 import { speak, stockSentence } from '../lib/speech';
+import { isMuted } from '../lib/mute';
 import type { Part } from '../lib/types';
 import CheckoutSheet from './CheckoutSheet';
 import { ChevronRight, PinIcon, SpeakerIcon } from './icons';
@@ -56,7 +57,7 @@ export default function PartDetail({ part, onCheckedOut, onOpenPart, sticky = fa
   // Read the part aloud as soon as it opens; stop talking when the mechanic leaves the page.
   useEffect(() => {
     if (!autoRead) return;
-    readOut();
+    if (!isMuted()) readOut(); // the speaker icon in the header mutes this
     return () => {
       try {
         window.speechSynthesis?.cancel();

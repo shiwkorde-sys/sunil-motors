@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { downloadCsv, parseCsv, type ParsedImport } from '../lib/csv';
-import { emptyQuery, searchParts, stockState, type Query } from '../lib/search';
+import { stockState } from '../lib/search';
 import { supabase } from '../lib/supabase';
-import type { Checkout, Part, Profile } from '../lib/types';
+import type { Part, Profile } from '../lib/types';
 import { useParts } from '../lib/useParts';
+import Inventory from '../components/Inventory';
+import StockKpis from '../components/StockKpis';
 import Billing from '../components/Billing';
 import Sales from '../components/Sales';
 import SettingsPanel from '../components/SettingsPanel';
-import PartDetail from '../components/PartDetail';
-import PartForm from '../components/PartForm';
-import SearchPanel from '../components/SearchPanel';
-import { ConfigWarning, ErrorNote, Modal, StockBadge } from '../components/ui';
+import { ConfigWarning, ErrorNote, StockBadge } from '../components/ui';
 
-const TABS = ['Overview', 'Inventory', 'Billing', 'Import', 'Sales', 'Team', 'Settings'] as const;
+const TABS = ['Overview', 'Inventory', 'Billing', 'Sales', 'Team', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function Dashboard() {
@@ -48,7 +46,6 @@ export default function Dashboard() {
         {tab === 'Inventory' && <Inventory parts={parts} reload={reload} />}
         {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
         {tab === 'Settings' && <SettingsPanel />}
-        {tab === 'Import' && <ImportCsv reload={reload} />}
         {tab === 'Sales' && <Sales parts={parts} />}
         {tab === 'Team' && <Team />}
       </main>
@@ -59,7 +56,6 @@ export default function Dashboard() {
 function Overview({ parts }: { parts: Part[] }) {
   const out = parts.filter((p) => stockState(p) === 'out');
   const low = parts.filter((p) => stockState(p) === 'low');
-  const units = parts.reduce((s, p) => s + p.quantity_available, 0);
   const byCat = useMemo(() => {
     const m = new Map<string, number>();
     parts.forEach((p) => m.set(p.category ?? 'Uncategorised', (m.get(p.category ?? 'Uncategorised') ?? 0) + p.quantity_available));
@@ -67,21 +63,9 @@ function Overview({ parts }: { parts: Part[] }) {
   }, [parts]);
   const max = Math.max(1, ...byCat.map(([, n]) => n));
 
-  const Kpi = ({ label, value, tone = '' }: { label: string; value: number; tone?: string }) => (
-    <div className="rounded-2xl bg-white p-5 shadow-sm">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className={`font-display text-5xl font-bold ${tone}`}>{value}</div>
-    </div>
-  );
-
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi label="Unique parts (SKUs)" value={parts.length} />
-        <Kpi label="Units in stock" value={units} />
-        <Kpi label="Low stock" value={low.length} tone="text-amber-600" />
-        <Kpi label="Out of stock" value={out.length} tone="text-red-600" />
-      </div>
+      <StockKpis parts={parts} />
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="mb-3 font-bold">Needs restocking</h2>
@@ -108,112 +92,6 @@ function Overview({ parts }: { parts: Part[] }) {
         </section>
       </div>
     </>
-  );
-}
-
-function Inventory({ parts, reload }: { parts: Part[]; reload: () => void }) {
-  const [query, setQuery] = useState<Query>(emptyQuery);
-  const [editing, setEditing] = useState<Part | 'new' | null>(null);
-  const [viewing, setViewing] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const rows = useMemo(() => searchParts(parts, query), [parts, query]);
-  const viewPart = parts.find((p) => p.id === viewing);
-
-  async function remove(p: Part) {
-    if (!confirm(`Delete "${p.name}"? Parts with checkout history cannot be deleted — set quantity to 0 instead.`)) return;
-    const { error } = await supabase.from('parts').delete().eq('id', p.id);
-    if (error) setErr(error.code === '23503' ? 'This part has checkout history, so it cannot be deleted. Set its quantity to 0 instead.' : error.message);
-    else reload();
-  }
-
-  return (
-    <>
-      <SearchPanel query={query} onChange={setQuery} parts={parts} />
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-slate-500">{rows.length} parts</span>
-        <div className="flex gap-2">
-          <button onClick={() => downloadCsv('inventory.csv', parts.map(({ id, compatible_models, ...r }) => ({ ...r, compatible_models: compatible_models.join('; ') })))} className="rounded-xl bg-white px-4 py-2 font-semibold shadow-sm">
-            Export CSV
-          </button>
-          <button onClick={() => setEditing('new')} className="rounded-xl bg-brand px-4 py-2 font-semibold text-white">+ Add part</button>
-        </div>
-      </div>
-      {err && <ErrorNote>{err}</ErrorNote>}
-      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500">
-            <tr>{['SKU', 'Part', 'Compatible models', 'Shelf', 'Stock', ''].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y">
-            {rows.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2 font-mono text-xs">{p.sku}</td>
-                <td className="px-4 py-2"><button onClick={() => setViewing(p.id)} className="text-left font-semibold hover:underline">{p.name}</button><div className="text-xs text-slate-400">{p.company} · {p.category}</div></td>
-                <td className="max-w-xs px-4 py-2">{p.compatible_models.join(', ')}</td>
-                <td className="px-4 py-2">{p.shelf_location}</td>
-                <td className="px-4 py-2"><StockBadge part={p} /></td>
-                <td className="whitespace-nowrap px-4 py-2 text-right">
-                  <button onClick={() => setEditing(p)} className="mr-3 text-brand hover:underline">Edit</button>
-                  <button onClick={() => remove(p)} className="text-slate-400 hover:text-red-600">Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {editing && <PartForm part={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} onSaved={reload} />}
-      {viewPart && (
-        <Modal title="Part details" onClose={() => setViewing(null)}>
-          <PartDetail part={viewPart} onCheckedOut={() => { reload(); setViewing(null); }} onOpenPart={setViewing} />
-        </Modal>
-      )}
-    </>
-  );
-}
-
-function ImportCsv({ reload }: { reload: () => void }) {
-  const [parsed, setParsed] = useState<ParsedImport | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function pick(file?: File) {
-    setParsed(null); setStatus(null); setError(null);
-    if (!file) return;
-    try { setParsed(await parseCsv(file)); } catch (e) { setError((e as Error).message); }
-  }
-
-  async function run() {
-    if (!parsed) return;
-    setBusy(true); setError(null);
-    for (let i = 0; i < parsed.rows.length; i += 200) {
-      const { error } = await supabase.from('parts').upsert(parsed.rows.slice(i, i + 200), { onConflict: 'sku' });
-      if (error) { setBusy(false); return setError(`Stopped after ${i} rows: ${error.message}`); }
-      setStatus(`Imported ${Math.min(i + 200, parsed.rows.length)} of ${parsed.rows.length}…`);
-    }
-    setBusy(false); setStatus(`Done — ${parsed.rows.length} parts added or updated.`); setParsed(null); reload();
-  }
-
-  return (
-    <section className="max-w-3xl space-y-4 rounded-2xl bg-white p-6 shadow-sm">
-      <p className="text-slate-600">
-        Upload a CSV (in Excel: open the <b>07_All_Parts_Master_CSV</b> sheet → File → Save As → CSV). Parts with a SKU that already exists are
-        <b> updated</b>; new SKUs are <b>added</b>. Each part's vehicle model becomes its first compatible model.
-      </p>
-      <input type="file" accept=".csv,text/csv" onChange={(e) => pick(e.target.files?.[0])} />
-      {error && <ErrorNote>{error}</ErrorNote>}
-      {parsed && (
-        <div className="space-y-3">
-          <p><b>{parsed.rows.length}</b> parts ready to import{parsed.skipped.length > 0 && <>, {parsed.skipped.length} rows skipped</>}.</p>
-          {parsed.skipped.length > 0 && <ul className="max-h-24 overflow-auto text-xs text-amber-700">{parsed.skipped.map((s) => <li key={s}>{s}</li>)}</ul>}
-          <table className="w-full text-xs">
-            <tbody>{parsed.rows.slice(0, 5).map((r) => <tr key={r.sku} className="border-t"><td className="py-1 font-mono">{r.sku}</td><td>{r.name}</td><td>{r.compatible_models.join(', ')}</td><td>{r.quantity_available}</td></tr>)}</tbody>
-          </table>
-          <button disabled={busy} onClick={run} className="rounded-xl bg-brand px-6 py-3 font-bold text-white disabled:opacity-60">{busy ? 'Importing…' : 'Import now'}</button>
-        </div>
-      )}
-      {status && <p className="rounded-xl bg-green-50 p-3 text-green-800">{status}</p>}
-    </section>
   );
 }
 
