@@ -10,7 +10,7 @@ import StockKpis from '../components/StockKpis';
 import Billing from '../components/Billing';
 import Sales from '../components/Sales';
 import SettingsPanel from '../components/SettingsPanel';
-import { ConfigWarning, ErrorNote, StockBadge } from '../components/ui';
+import { ConfigWarning, ErrorNote, Modal, StockBadge } from '../components/ui';
 
 const TABS = ['Overview', 'Inventory', 'Billing', 'Sales', 'Team', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -108,6 +108,22 @@ function Team() {
     if (error) setErr(error.message); else void load();
   }
 
+  const [removing, setRemoving] = useState<Profile | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function remove() {
+    if (!removing) return;
+    setBusy(true); setErr(null); setNote(null);
+    const { error } = await supabase.rpc('delete_user', { p_user_id: removing.id });
+    setBusy(false);
+    if (error) setErr(error.message);
+    else {
+      setNote(`${removing.full_name || removing.email} was removed. Their old sales and bills are still in your records.`);
+      void load();
+    }
+    setRemoving(null);
+  }
+
   async function sendReset(p: Profile) {
     setErr(null); setNote(null);
     if (!p.email) return setErr('This person has no email on file.');
@@ -118,7 +134,7 @@ function Team() {
 
   return (
     <section className="max-w-2xl space-y-3">
-      <p className="text-sm text-slate-500">Mechanics create their own account on the login page. Each person's name is used in the Sales list. Promote someone to admin here, or send a password reset link if they forgot theirs.</p>
+      <p className="text-sm text-slate-500">Mechanics create their own account on the login page. Each person's name is used in the Sales list. Promote someone to admin, send a password reset link, or remove an account when someone leaves.</p>
       {err && <ErrorNote>{err}</ErrorNote>}
       {note && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{note}</p>}
       <ul className="divide-y rounded-2xl bg-white shadow-sm">
@@ -131,10 +147,30 @@ function Team() {
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
               </select>
+              <button
+                onClick={() => setRemoving(p)}
+                disabled={p.id === me?.id || p.role === 'admin'}
+                title={p.id === me?.id ? 'You cannot remove yourself' : p.role === 'admin' ? 'Change to Staff first' : 'Remove account'}
+                className="h-11 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Remove
+              </button>
             </div>
           </li>
         ))}
       </ul>
+      {removing && (
+        <Modal title="Remove this account?" onClose={() => !busy && setRemoving(null)}>
+          <p className="text-slate-700">
+            <b>{removing.full_name || removing.email}</b> will no longer be able to sign in. Their past sales and bills stay in your records with their name.
+          </p>
+          <p className="mt-2 text-sm text-slate-500">This cannot be undone. They can create a new account later if needed.</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button onClick={() => setRemoving(null)} disabled={busy} className="h-11 rounded-lg border px-4 font-semibold">Cancel</button>
+            <button onClick={remove} disabled={busy} className="h-11 rounded-lg bg-red-600 px-4 font-semibold text-white disabled:opacity-60">{busy ? 'Removing…' : 'Remove account'}</button>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
