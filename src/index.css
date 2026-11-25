@@ -49,34 +49,43 @@ body {
   body { background: white !important; }
 }
 
-/* ───────── Admin dashboard theme: warm stone surfaces, charcoal sidebar, copper accents ─────────
+/* ───────── Admin dashboard theme: calm Apple-style surfaces, shades of blue ─────────
    Scoped to .admin so the mechanic phone app keeps its own look. */
 .admin {
-  background: #f7f6f2;
-  color: #1f1d1a;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.011em;
 }
-.admin :focus-visible { outline-color: #0284c7; }
-.admin .font-mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.admin .num { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-.admin .bg-white.shadow-sm, .admin .bg-white.shadow { box-shadow: none; border: 1px solid #e6e4dd; }
-.admin .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: #eeece5; }
-.admin .border-slate-200 { border-color: #e6e4dd; }
-.admin .border-slate-300 { border-color: #dad7ce; }
-.admin .bg-slate-50 { background-color: #faf9f5; }
-.admin .bg-slate-100 { background-color: #f0eee8; }
-.admin .bg-slate-200 { background-color: #e8e5dd; }
-.admin .text-slate-400 { color: #a29e93; }
-.admin .text-slate-500 { color: #7a766c; }
-.admin .text-slate-600 { color: #5f5b52; }
-.admin .text-slate-700 { color: #47443d; }
-.admin .bg-brand { background-color: #0369a1; }
-.admin .bg-brand:hover, .admin .hover\:bg-brand-dark:hover { background-color: #075985; }
-.admin .text-brand { color: #0369a1; }
-.admin .border-brand, .admin .focus\:border-brand:focus { border-color: #0284c7; }
-.admin .ring-brand { --tw-ring-color: #0284c7; }
-.admin .focus\:ring-brand\/20:focus { --tw-ring-color: rgba(2, 132, 199, 0.2); }
-.admin input:focus, .admin select:focus { border-color: #0284c7; }
-.admin .rounded-2xl { border-radius: 14px; }
-.admin tbody tr:hover { background-color: #faf9f5; }
-.admin .bg-slate-900 { background-color: #26241f; }
+.admin :focus-visible { outline: 3px solid rgba(0, 113, 227, 0.35); outline-offset: 2px; border-radius: 8px; }
+.admin .font-mono { font-family: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: 0; }
+.admin .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; letter-spacing: -0.035em; }
+.admin .card, .admin .bg-white.shadow-sm, .admin .bg-white.shadow { background: #fff; border: 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.045), 0 1px 3px rgba(0, 0, 0, 0.04); }
+.admin .card { border-radius: 20px; }
+.admin .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: #f0f0f3; }
+.admin .border-slate-200 { border-color: #e8e8ed; }
+.admin .border-slate-300 { border-color: #d2d2d7; }
+.admin .bg-slate-50 { background-color: #fafafc; }
+.admin .bg-slate-100 { background-color: #f2f2f5; }
+.admin .bg-slate-200 { background-color: #e8e8ed; }
+.admin .bg-slate-900 { background-color: #1d1d1f; }
+.admin .text-slate-400 { color: #a1a1a6; }
+.admin .text-slate-500 { color: #6e6e73; }
+.admin .text-slate-600 { color: #515154; }
+.admin .text-slate-700 { color: #3a3a3c; }
+.admin .bg-brand { background-color: #0071e3; }
+.admin .bg-brand:hover, .admin .hover\:bg-brand-dark:hover { background-color: #0077ed; }
+.admin .text-brand { color: #0071e3; }
+.admin .border-brand, .admin .focus\:border-brand:focus { border-color: #0071e3; }
+.admin .ring-brand { --tw-ring-color: #0071e3; }
+.admin .focus\:ring-brand\/20:focus { --tw-ring-color: rgba(0, 113, 227, 0.22); }
+.admin input:focus, .admin select:focus { border-color: #0071e3; outline: none; box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.16); }
+.admin input, .admin select { border-radius: 12px; transition: box-shadow 0.18s, border-color 0.18s; }
+.admin .rounded-2xl { border-radius: 18px; }
+.admin button, .admin a { transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s, color 0.18s, box-shadow 0.18s, border-color 0.18s, opacity 0.18s; }
+.admin button:not(:disabled):active { transform: scale(0.97); }
+.admin button.bg-brand, .admin button.bg-slate-900 { border-radius: 999px; }
+.admin tbody tr { transition: background-color 0.15s; }
+.admin tbody tr:hover { background-color: #f5f9ff; }
+.admin thead tr, .admin thead th { background-color: #fafafc; }
