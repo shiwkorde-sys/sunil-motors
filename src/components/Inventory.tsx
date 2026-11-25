@@ -7,11 +7,11 @@ import BulkUpload from './BulkUpload';
 import PartDetail from './PartDetail';
 import PartForm from './PartForm';
 import SearchPanel from './SearchPanel';
-import StockKpis from './StockKpis';
+import StockKpis, { type StockPick } from './StockKpis';
 import { ErrorNote, Modal, StockBadge } from './ui';
 
 type GroupBy = 'none' | 'category' | 'vehicle';
-type Status = 'all' | 'ok' | 'low' | 'out';
+type Status = StockPick;
 const NONE = 'Not set';
 const sel = 'h-11 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm';
 
@@ -33,12 +33,14 @@ export default function Inventory({ parts, reload }: { parts: Part[]; reload: ()
     return { brands: uniq(parts.map((p) => p.company)), cats: uniq(parts.map((p) => p.category)), models: uniq(parts.flatMap((p) => p.compatible_models)) };
   }, [parts]);
 
+  // `scoped` = everything the search and filters leave, ignoring the stock choice, so the four numbers stay meaningful when one is picked.
+  const scoped = useMemo(
+    () => searchParts(parts, query).filter((p) => (!brand || p.company === brand) && (!category || p.category === category) && (!model || p.compatible_models.includes(model))),
+    [parts, query, brand, category, model],
+  );
   const rows = useMemo(
-    () =>
-      searchParts(parts, query).filter(
-        (p) => (!brand || p.company === brand) && (!category || p.category === category) && (!model || p.compatible_models.includes(model)) && (status === 'all' || stockState(p) === status),
-      ),
-    [parts, query, brand, category, model, status],
+    () => scoped.filter((p) => status === 'all' || (status === 'in' ? p.quantity_available > 0 : stockState(p) === status)),
+    [scoped, status],
   );
 
   // Group by part type or by vehicle. A part that fits several bikes appears under each of them.
@@ -89,7 +91,7 @@ export default function Inventory({ parts, reload }: { parts: Part[]; reload: ()
 
   return (
     <>
-      <StockKpis parts={rows} compact />
+      <StockKpis parts={scoped} compact active={status} onPick={setStatus} />
 
       <SearchPanel query={query} onChange={setQuery} parts={parts} />
 
@@ -97,7 +99,7 @@ export default function Inventory({ parts, reload }: { parts: Part[]; reload: ()
         <label className="text-xs text-slate-500">Brand<select className={sel + ' mt-0.5 block'} value={brand} onChange={(e) => setBrand(e.target.value)}><option value="">All brands</option>{opts.brands.map((x) => <option key={x}>{x}</option>)}</select></label>
         <label className="text-xs text-slate-500">Part type<select className={sel + ' mt-0.5 block'} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All types</option>{opts.cats.map((x) => <option key={x}>{x}</option>)}</select></label>
         <label className="text-xs text-slate-500">Vehicle<select className={sel + ' mt-0.5 block'} value={model} onChange={(e) => setModel(e.target.value)}><option value="">All vehicles</option>{opts.models.map((x) => <option key={x}>{x}</option>)}</select></label>
-        <label className="text-xs text-slate-500">Stock<select className={sel + ' mt-0.5 block'} value={status} onChange={(e) => setStatus(e.target.value as Status)}><option value="all">Any stock</option><option value="ok">In stock</option><option value="low">Low</option><option value="out">Out of stock</option></select></label>
+        <label className="text-xs text-slate-500">Stock<select className={sel + ' mt-0.5 block'} value={status} onChange={(e) => setStatus(e.target.value as Status)}><option value="all">Any stock</option><option value="in">Has stock</option><option value="low">Low</option><option value="out">Out of stock</option></select></label>
         <label className="text-xs text-slate-500">Group by<select className={sel + ' mt-0.5 block font-semibold'} value={groupBy} onChange={(e) => { setGroupBy(e.target.value as GroupBy); setClosed(new Set()); }}><option value="none">No grouping</option><option value="category">Part type</option><option value="vehicle">Vehicle</option></select></label>
         {filtered && <button onClick={clear} className="h-11 px-3 text-sm font-semibold text-brand underline">Clear filters</button>}
       </div>
