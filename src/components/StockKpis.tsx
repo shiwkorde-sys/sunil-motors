@@ -33,7 +33,7 @@ export default function StockKpis({ parts, compact = false, active, onPick, dela
       {items.map((k, i) => {
         const on = onPick ? (active ?? 'all') === k.pick : false;
         const Icon = k.icon;
-        const cls = `group relative overflow-hidden rounded-[14px] border bg-white text-left ${compact ? 'px-4 pb-3 pt-4' : 'px-5 pb-4 pt-5'} ${on ? 'border-[#d97706]' : 'border-[#e6e4dd] hover:border-[#cfcbbf]'} transition-colors`;
+        const cls = `group relative overflow-hidden rounded-[14px] border bg-white text-left ${compact ? 'px-4 pb-3 pt-4' : 'px-5 pb-4 pt-5'} ${on ? 'border-[#0284c7]' : 'border-[#e6e4dd] hover:border-[#cfcbbf]'} transition-colors`;
         const body = (
           <>
             {/* thin coloured line along the top edge */}

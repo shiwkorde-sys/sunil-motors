@@ -51,13 +51,13 @@ export default function RestockList({ parts, onOpen }: { parts: Part[]; onOpen: 
             <button
               type="button"
               onClick={(e) => copy(e, p)}
-              className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#e0ddd3] bg-white px-2.5 text-xs font-semibold text-[#5f5b52] opacity-0 transition hover:border-[#d97706] hover:text-[#b45309] focus-visible:opacity-100 group-hover:opacity-100 active:scale-95"
+              className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#e0ddd3] bg-white px-2.5 text-xs font-semibold text-[#5f5b52] opacity-0 transition hover:border-[#0284c7] hover:text-[#0369a1] focus-visible:opacity-100 group-hover:opacity-100 active:scale-95"
             >
               <CopyIcon className="h-3.5 w-3.5" />
               {copied === p.id ? 'Copied' : 'Copy reorder note'}
             </button>
             <StockBadge part={p} />
-            <ChevronRight className="h-4 w-4 shrink-0 text-[#b9b4a7] transition-transform duration-200 group-hover:translate-x-1 group-hover:text-[#b45309]" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-[#b9b4a7] transition-transform duration-200 group-hover:translate-x-1 group-hover:text-[#0369a1]" />
           </div>
         </m.li>
       ))}

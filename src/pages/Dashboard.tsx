@@ -47,7 +47,7 @@ export default function Dashboard() {
         <div className="admin flex min-h-screen flex-col lg:flex-row">
           <aside className="w-full shrink-0 bg-[#141517] p-4 text-white lg:flex lg:min-h-screen lg:w-60 lg:flex-col lg:p-5 lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]">
             <div className="mb-3 flex items-center gap-2.5 lg:mb-8">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#d97706] to-[#92400e] text-sm font-extrabold text-white shadow-inner">S</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#0284c7] to-[#075985] text-sm font-extrabold text-white shadow-inner">S</span>
               <div className="leading-tight">
                 <div className="text-[15px] font-bold tracking-tight">Sunil Motors</div>
                 <div className="text-[11px] text-[#8b867b]">Garage &amp; spares</div>

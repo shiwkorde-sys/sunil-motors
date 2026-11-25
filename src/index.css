@@ -56,7 +56,7 @@ body {
   color: #1f1d1a;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
-.admin :focus-visible { outline-color: #d97706; }
+.admin :focus-visible { outline-color: #0284c7; }
 .admin .font-mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .admin .num { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .admin .bg-white.shadow-sm, .admin .bg-white.shadow { box-shadow: none; border: 1px solid #e6e4dd; }
@@ -70,13 +70,13 @@ body {
 .admin .text-slate-500 { color: #7a766c; }
 .admin .text-slate-600 { color: #5f5b52; }
 .admin .text-slate-700 { color: #47443d; }
-.admin .bg-brand { background-color: #b45309; }
-.admin .bg-brand:hover, .admin .hover\:bg-brand-dark:hover { background-color: #92400e; }
-.admin .text-brand { color: #b45309; }
-.admin .border-brand, .admin .focus\:border-brand:focus { border-color: #d97706; }
-.admin .ring-brand { --tw-ring-color: #d97706; }
-.admin .focus\:ring-brand\/20:focus { --tw-ring-color: rgba(217, 119, 6, 0.2); }
-.admin input:focus, .admin select:focus { border-color: #d97706; }
+.admin .bg-brand { background-color: #0369a1; }
+.admin .bg-brand:hover, .admin .hover\:bg-brand-dark:hover { background-color: #075985; }
+.admin .text-brand { color: #0369a1; }
+.admin .border-brand, .admin .focus\:border-brand:focus { border-color: #0284c7; }
+.admin .ring-brand { --tw-ring-color: #0284c7; }
+.admin .focus\:ring-brand\/20:focus { --tw-ring-color: rgba(2, 132, 199, 0.2); }
+.admin input:focus, .admin select:focus { border-color: #0284c7; }
 .admin .rounded-2xl { border-radius: 14px; }
 .admin tbody tr:hover { background-color: #faf9f5; }
 .admin .bg-slate-900 { background-color: #26241f; }

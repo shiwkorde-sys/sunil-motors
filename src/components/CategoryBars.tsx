@@ -22,7 +22,7 @@ export default function CategoryBars({ data }: { data: [string, number][] }) {
             <div className="relative h-2.5 rounded-full bg-[#eeebe3]">
               <m.div
                 className="relative h-full overflow-hidden rounded-full"
-                style={{ background: 'linear-gradient(90deg, #b45309, #e8a33d)' }}
+                style={{ background: 'linear-gradient(90deg, #0369a1, #38bdf8)' }}
                 initial={{ width: 0 }}
                 whileInView={{ width: `${width}%` }}
                 viewport={{ once: true, margin: '-20px' }}
