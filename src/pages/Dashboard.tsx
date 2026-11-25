@@ -15,10 +15,22 @@ import { ConfigWarning, ErrorNote, Modal, StockBadge } from '../components/ui';
 const TABS = ['Overview', 'Inventory', 'Billing', 'Sales', 'Team', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
 
+/** The open tab lives in the web address (#sales), so a refresh, a bookmark or the Back button returns to the same tab. */
+const tabFromHash = (): Tab => TABS.find((t) => t.toLowerCase() === window.location.hash.slice(1).toLowerCase()) ?? 'Overview';
+function useTab(): [Tab, (t: Tab) => void] {
+  const [tab, setTab] = useState<Tab>(tabFromHash);
+  useEffect(() => {
+    const on = () => setTab(tabFromHash());
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  return [tab, (t) => { window.location.hash = t.toLowerCase(); }];
+}
+
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
   const { parts, loading, error, reload } = useParts();
-  const [tab, setTab] = useState<Tab>('Overview');
+  const [tab, setTab] = useTab();
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
