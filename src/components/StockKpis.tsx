@@ -11,7 +11,7 @@ export default function StockKpis({ parts, compact = false, active, onPick }: { 
   const low = parts.filter((p) => stockState(p) === 'low').length;
   const out = parts.filter((p) => stockState(p) === 'out').length;
   const items = [
-    { label: 'Unique parts (SKUs)', value: parts.length, tone: '', pick: 'all' as StockPick },
+    { label: 'All parts', value: parts.length, tone: '', pick: 'all' as StockPick },
     { label: 'Units in stock', value: units, tone: '', pick: 'in' as StockPick },
     { label: 'Low stock', value: low, tone: low ? 'text-amber-600' : '', pick: 'low' as StockPick },
     { label: 'Out of stock', value: out, tone: out ? 'text-red-600' : '', pick: 'out' as StockPick },
