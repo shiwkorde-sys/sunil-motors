@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LazyMotion, MotionConfig, domMax, m } from 'framer-motion';
+import { AnimatePresence, LazyMotion, MotionConfig, domMax, m } from 'framer-motion';
 import { useAuth } from '../lib/auth';
 import { stockState } from '../lib/search';
 import { supabase } from '../lib/supabase';
@@ -45,35 +45,39 @@ export default function Dashboard() {
     <LazyMotion features={domMax} strict>
       <MotionConfig reducedMotion="user">
         <div className="admin flex min-h-screen flex-col lg:flex-row">
-          <aside className="w-full shrink-0 bg-[#141517] p-4 text-white lg:flex lg:min-h-screen lg:w-60 lg:flex-col lg:p-5 lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]">
+          <aside className="sticky top-0 z-20 w-full shrink-0 border-b border-black/[0.06] bg-white/70 p-4 backdrop-blur-2xl lg:flex lg:h-screen lg:w-60 lg:flex-col lg:border-b-0 lg:border-r lg:p-5">
             <div className="mb-3 flex items-center gap-2.5 lg:mb-8">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#0284c7] to-[#075985] text-sm font-extrabold text-white shadow-inner">S</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-b from-[#2997ff] to-[#0071e3] text-sm font-bold text-white shadow-[0_2px_6px_rgba(0,113,227,0.35)]">S</span>
               <div className="leading-tight">
-                <div className="text-[15px] font-bold tracking-tight">Sunil Motors</div>
-                <div className="text-[11px] text-[#8b867b]">Garage &amp; spares</div>
+                <div className="text-[15px] font-semibold tracking-tight text-[#1d1d1f]">Sunil Motors</div>
+                <div className="text-[11px] text-[#86868b]">Garage &amp; spares</div>
               </div>
             </div>
             <AdminNav tabs={TABS} tab={tab} onPick={setTab} />
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/[0.06] pt-4 text-sm text-[#8b867b] lg:mt-auto lg:block lg:space-y-2">
-              <Link to="/m" className="block underline decoration-white/20 underline-offset-2 hover:text-white">Mechanic view</Link>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/[0.06] pt-4 text-sm text-[#6e6e73] lg:mt-auto lg:block lg:space-y-2">
+              <Link to="/m" className="block underline decoration-black/20 underline-offset-2 hover:text-[#0071e3]">Mechanic view</Link>
               <div className="truncate text-xs">{profile?.email}</div>
-              <button onClick={signOut} className="underline decoration-white/20 underline-offset-2 hover:text-white active:scale-95">Sign out</button>
+              <button onClick={signOut} className="underline decoration-black/20 underline-offset-2 hover:text-[#0071e3]">Sign out</button>
             </div>
           </aside>
           <main className="min-w-0 flex-1 space-y-5 p-4 lg:p-8">
             <ConfigWarning />
             <header>
-              <p className="text-[13px] font-medium text-[#8a8579]">{first ? `${greeting()}, ${first} · ` : ''}{today}</p>
-              <h1 className="mt-0.5 text-[1.75rem] font-extrabold tracking-tight text-[#1f1d1a]">{tab}</h1>
+              <p className="text-[13px] font-medium text-[#86868b]">{first ? `${greeting()}, ${first} · ` : ''}{today}</p>
+              <h1 className="mt-1 text-[2.125rem] font-bold leading-tight tracking-[-0.035em] text-[#1d1d1f]">{tab}</h1>
             </header>
             {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
-            {loading && <p className="text-[#7a766c]">Loading…</p>}
-            {tab === 'Overview' && <Overview parts={parts} onOpenPart={(p) => { setSeed({ vehicle: '', part: p.sku, any: '' }); setTab('Inventory'); }} />}
-            {tab === 'Inventory' && <Inventory parts={parts} reload={reload} initialQuery={seed} />}
-            {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
-            {tab === 'Settings' && <SettingsPanel />}
-            {tab === 'Sales' && <Sales parts={parts} />}
-            {tab === 'Team' && <Team />}
+            {loading && <p className="text-[#6e6e73]">Loading…</p>}
+            <AnimatePresence mode="wait" initial={false}>
+              <m.div key={tab} className="space-y-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
+              {tab === 'Overview' && <Overview parts={parts} onOpenPart={(p) => { setSeed({ vehicle: '', part: p.sku, any: '' }); setTab('Inventory'); }} />}
+              {tab === 'Inventory' && <Inventory parts={parts} reload={reload} initialQuery={seed} />}
+              {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
+              {tab === 'Settings' && <SettingsPanel />}
+              {tab === 'Sales' && <Sales parts={parts} />}
+              {tab === 'Team' && <Team />}
+              </m.div>
+            </AnimatePresence>
           </main>
         </div>
       </MotionConfig>
@@ -96,7 +100,7 @@ function Overview({ parts, onOpenPart }: { parts: Part[]; onOpenPart: (p: Part) 
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
   }, [parts]);
 
-  const panel = 'rounded-[14px] border border-[#e6e4dd] bg-white p-5';
+  const panel = 'card p-6';
   const enter = (i: number) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.25 + i * 0.05, duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } });
 
   return (
@@ -106,7 +110,7 @@ function Overview({ parts, onOpenPart }: { parts: Part[]; onOpenPart: (p: Part) 
         <m.section className={panel} {...enter(0)}>
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="font-bold tracking-tight">Needs restocking</h2>
-            {need.length > 0 && <span className="num text-xs text-[#8a8579]">{Math.min(need.length, 12)} of {need.length}</span>}
+            {need.length > 0 && <span className="num text-xs text-[#86868b]">{Math.min(need.length, 12)} of {need.length}</span>}
           </div>
           <RestockList parts={need.slice(0, 12)} onOpen={onOpenPart} />
         </m.section>
