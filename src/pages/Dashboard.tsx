@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { LazyMotion, MotionConfig, domMax, m } from 'framer-motion';
 import { useAuth } from '../lib/auth';
 import { stockState } from '../lib/search';
 import { supabase } from '../lib/supabase';
@@ -10,7 +11,11 @@ import StockKpis from '../components/StockKpis';
 import Billing from '../components/Billing';
 import Sales from '../components/Sales';
 import SettingsPanel from '../components/SettingsPanel';
-import { ConfigWarning, ErrorNote, Modal, StockBadge } from '../components/ui';
+import AdminNav from '../components/AdminNav';
+import CategoryBars from '../components/CategoryBars';
+import RestockList from '../components/RestockList';
+import { emptyQuery, type Query } from '../lib/search';
+import { ConfigWarning, ErrorNote, Modal } from '../components/ui';
 
 const TABS = ['Overview', 'Inventory', 'Billing', 'Sales', 'Team', 'Settings'] as const;
 type Tab = (typeof TABS)[number];
@@ -32,76 +37,83 @@ export default function Dashboard() {
   const { parts, loading, error, reload } = useParts();
   const [tab, setTab] = useTab();
 
+  const [seed, setSeed] = useState<Query>(emptyQuery); // lets a row on Overview open Inventory already searching for that part
+  const first = (profile?.full_name || profile?.email || '').split(/[ @]/)[0];
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
-      <aside className="w-full shrink-0 bg-slate-900 p-4 text-white lg:w-56">
-        <div className="mb-3 font-display text-2xl font-bold uppercase tracking-wide lg:mb-6">Sunil Motors</div>
-        <nav className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">
-          {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2.5 text-left lg:w-full ${tab === t ? 'bg-brand font-semibold' : 'hover:bg-white/10'}`}>
-              {t}
-            </button>
-          ))}
-        </nav>
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400 lg:mt-8 lg:block lg:space-y-2">
-          <Link to="/m" className="block underline">Mechanic view</Link>
-          <div className="truncate">{profile?.email}</div>
-          <button onClick={signOut} className="underline">Sign out</button>
+    <LazyMotion features={domMax} strict>
+      <MotionConfig reducedMotion="user">
+        <div className="admin flex min-h-screen flex-col lg:flex-row">
+          <aside className="w-full shrink-0 bg-[#141517] p-4 text-white lg:flex lg:min-h-screen lg:w-60 lg:flex-col lg:p-5 lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]">
+            <div className="mb-3 flex items-center gap-2.5 lg:mb-8">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#d97706] to-[#92400e] text-sm font-extrabold text-white shadow-inner">S</span>
+              <div className="leading-tight">
+                <div className="text-[15px] font-bold tracking-tight">Sunil Motors</div>
+                <div className="text-[11px] text-[#8b867b]">Garage &amp; spares</div>
+              </div>
+            </div>
+            <AdminNav tabs={TABS} tab={tab} onPick={setTab} />
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/[0.06] pt-4 text-sm text-[#8b867b] lg:mt-auto lg:block lg:space-y-2">
+              <Link to="/m" className="block underline decoration-white/20 underline-offset-2 hover:text-white">Mechanic view</Link>
+              <div className="truncate text-xs">{profile?.email}</div>
+              <button onClick={signOut} className="underline decoration-white/20 underline-offset-2 hover:text-white active:scale-95">Sign out</button>
+            </div>
+          </aside>
+          <main className="min-w-0 flex-1 space-y-5 p-4 lg:p-8">
+            <ConfigWarning />
+            <header>
+              <p className="text-[13px] font-medium text-[#8a8579]">{first ? `${greeting()}, ${first} · ` : ''}{today}</p>
+              <h1 className="mt-0.5 text-[1.75rem] font-extrabold tracking-tight text-[#1f1d1a]">{tab}</h1>
+            </header>
+            {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
+            {loading && <p className="text-[#7a766c]">Loading…</p>}
+            {tab === 'Overview' && <Overview parts={parts} onOpenPart={(p) => { setSeed({ vehicle: '', part: p.sku, any: '' }); setTab('Inventory'); }} />}
+            {tab === 'Inventory' && <Inventory parts={parts} reload={reload} initialQuery={seed} />}
+            {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
+            {tab === 'Settings' && <SettingsPanel />}
+            {tab === 'Sales' && <Sales parts={parts} />}
+            {tab === 'Team' && <Team />}
+          </main>
         </div>
-      </aside>
-      <main className="min-w-0 flex-1 space-y-4 p-4 lg:p-6">
-        <ConfigWarning />
-        <h1 className="font-display text-3xl font-bold uppercase">{tab}</h1>
-        {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
-        {loading && <p className="text-slate-500">Loading…</p>}
-        {tab === 'Overview' && <Overview parts={parts} />}
-        {tab === 'Inventory' && <Inventory parts={parts} reload={reload} />}
-        {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
-        {tab === 'Settings' && <SettingsPanel />}
-        {tab === 'Sales' && <Sales parts={parts} />}
-        {tab === 'Team' && <Team />}
-      </main>
-    </div>
+      </MotionConfig>
+    </LazyMotion>
   );
 }
 
-function Overview({ parts }: { parts: Part[] }) {
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+};
+
+function Overview({ parts, onOpenPart }: { parts: Part[]; onOpenPart: (p: Part) => void }) {
   const out = parts.filter((p) => stockState(p) === 'out');
   const low = parts.filter((p) => stockState(p) === 'low');
+  const need = [...out, ...low];
   const byCat = useMemo(() => {
-    const m = new Map<string, number>();
-    parts.forEach((p) => m.set(p.category ?? 'Uncategorised', (m.get(p.category ?? 'Uncategorised') ?? 0) + p.quantity_available));
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    const map = new Map<string, number>();
+    parts.forEach((p) => map.set(p.category ?? 'Uncategorised', (map.get(p.category ?? 'Uncategorised') ?? 0) + p.quantity_available));
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
   }, [parts]);
-  const max = Math.max(1, ...byCat.map(([, n]) => n));
+
+  const panel = 'rounded-[14px] border border-[#e6e4dd] bg-white p-5';
+  const enter = (i: number) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.25 + i * 0.05, duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } });
 
   return (
     <>
       <StockKpis parts={parts} />
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-bold">Needs restocking</h2>
-          {[...out, ...low].length === 0 && <p className="text-slate-500">Everything is healthy 👍</p>}
-          <ul className="divide-y">
-            {[...out, ...low].slice(0, 12).map((p) => (
-              <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                <span>{p.name} <span className="text-slate-400">· {p.sku}</span></span>
-                <StockBadge part={p} />
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-bold">Units by category</h2>
-          <ul className="space-y-2">
-            {byCat.map(([c, n]) => (
-              <li key={c} className="text-sm">
-                <div className="flex justify-between"><span>{c}</span><b>{n}</b></div>
-                <div className="h-2 rounded bg-slate-100"><div className="h-2 rounded bg-brand" style={{ width: `${(n / max) * 100}%` }} /></div>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <m.section className={panel} {...enter(0)}>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="font-bold tracking-tight">Needs restocking</h2>
+            {need.length > 0 && <span className="num text-xs text-[#8a8579]">{Math.min(need.length, 12)} of {need.length}</span>}
+          </div>
+          <RestockList parts={need.slice(0, 12)} onOpen={onOpenPart} />
+        </m.section>
+        <m.section className={panel} {...enter(1)}>
+          <h2 className="mb-4 font-bold tracking-tight">Units by category</h2>
+          <CategoryBars data={byCat} />
+        </m.section>
       </div>
     </>
   );

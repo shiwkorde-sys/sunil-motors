@@ -15,8 +15,8 @@ type Status = StockPick;
 const NONE = 'Not set';
 const sel = 'h-11 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm';
 
-export default function Inventory({ parts, reload }: { parts: Part[]; reload: () => void }) {
-  const [query, setQuery] = useState<Query>(emptyQuery);
+export default function Inventory({ parts, reload, initialQuery }: { parts: Part[]; reload: () => void; initialQuery?: Query }) {
+  const [query, setQuery] = useState<Query>(initialQuery ?? emptyQuery);
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
   const [model, setModel] = useState('');

@@ -64,3 +64,19 @@ export const EyeIcon = ({ className = '', off = false }: P & { off?: boolean }) 
     {off && <path d="m4 4 16 16" />}
   </svg>
 );
+
+export const BoxIcon = ({ className = '' }: P) => (
+  <svg {...base} className={className}><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>
+);
+export const LayersIcon = ({ className = '' }: P) => (
+  <svg {...base} className={className}><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 13 9 5 9-5" /></svg>
+);
+export const HourglassIcon = ({ className = '' }: P) => (
+  <svg {...base} className={className}><path d="M6 3h12M6 21h12M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4" /></svg>
+);
+export const BanIcon = ({ className = '' }: P) => (
+  <svg {...base} className={className}><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></svg>
+);
+export const CopyIcon = ({ className = '' }: P) => (
+  <svg {...base} className={className}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></svg>
+);
