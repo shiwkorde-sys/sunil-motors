@@ -48,3 +48,35 @@ body {
   .print-only { display: block !important; }
   body { background: white !important; }
 }
+
+/* ───────── Admin dashboard theme: warm stone surfaces, charcoal sidebar, copper accents ─────────
+   Scoped to .admin so the mechanic phone app keeps its own look. */
+.admin {
+  background: #f7f6f2;
+  color: #1f1d1a;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.admin :focus-visible { outline-color: #0284c7; }
+.admin .font-mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin .num { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.admin .bg-white.shadow-sm, .admin .bg-white.shadow { box-shadow: none; border: 1px solid #e6e4dd; }
+.admin .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: #eeece5; }
+.admin .border-slate-200 { border-color: #e6e4dd; }
+.admin .border-slate-300 { border-color: #dad7ce; }
+.admin .bg-slate-50 { background-color: #faf9f5; }
+.admin .bg-slate-100 { background-color: #f0eee8; }
+.admin .bg-slate-200 { background-color: #e8e5dd; }
+.admin .text-slate-400 { color: #a29e93; }
+.admin .text-slate-500 { color: #7a766c; }
+.admin .text-slate-600 { color: #5f5b52; }
+.admin .text-slate-700 { color: #47443d; }
+.admin .bg-brand { background-color: #0369a1; }
+.admin .bg-brand:hover, .admin .hover\:bg-brand-dark:hover { background-color: #075985; }
+.admin .text-brand { color: #0369a1; }
+.admin .border-brand, .admin .focus\:border-brand:focus { border-color: #0284c7; }
+.admin .ring-brand { --tw-ring-color: #0284c7; }
+.admin .focus\:ring-brand\/20:focus { --tw-ring-color: rgba(2, 132, 199, 0.2); }
+.admin input:focus, .admin select:focus { border-color: #0284c7; }
+.admin .rounded-2xl { border-radius: 14px; }
+.admin tbody tr:hover { background-color: #faf9f5; }
+.admin .bg-slate-900 { background-color: #26241f; }

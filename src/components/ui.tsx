@@ -18,11 +18,18 @@ export function PartImage({ src, alt, className = '' }: { src: string | null; al
   return <img key={src} src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={`object-cover ${className}`} />;
 }
 
+/** Muted, earthy status colours: terracotta = out, ochre = low, deep green = healthy. */
 export function StockBadge({ part, big = false }: { part: Part; big?: boolean }) {
   const s = stockState(part);
-  const style = s === 'out' ? 'bg-red-100 text-red-800' : s === 'low' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800';
+  const tone =
+    s === 'out' ? { bg: '#F6E3DC', fg: '#8F3A22', dot: '#C4573A' } : s === 'low' ? { bg: '#F7EBC9', fg: '#7A5208', dot: '#C58A12' } : { bg: '#DDEBE3', fg: '#1D5A44', dot: '#2F8061' };
   const label = s === 'out' ? 'Out of stock' : s === 'low' ? `Low: ${part.quantity_available} left` : `${part.quantity_available} in stock`;
-  return <span className={`inline-block rounded-full font-semibold ${style} ${big ? 'px-4 py-1.5 text-base' : 'px-2.5 py-0.5 text-xs'}`}>{label}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold ${big ? 'px-4 py-1.5 text-base' : 'px-2.5 py-0.5 text-xs'}`} style={{ background: tone.bg, color: tone.fg }}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: tone.dot }} aria-hidden="true" />
+      {label}
+    </span>
+  );
 }
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
