@@ -77,6 +77,10 @@ export function MobileHome() {
   const results = useMemo(() => (searching ? searchParts(parts, query) : []), [parts, query, searching]);
 
   const examples = lang === 'hi' ? EXAMPLES_HI : EXAMPLES;
+  const { profile } = useAuth();
+  const first = (profile?.full_name || '').split(' ')[0];
+  const h = new Date().getHours();
+  const hello = lang === 'hi' ? (h < 12 ? 'सुप्रभात' : h < 17 ? 'नमस्कार' : 'शुभ संध्या') : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-40">
@@ -92,9 +96,19 @@ export function MobileHome() {
           </div>
         )}
 
+        {!searching && (
+          <div className="anim-up px-1 pt-1">
+            <p className="text-2xl font-bold tracking-tight text-slate-900">
+              {hello}
+              {first ? `, ${first}` : ''}
+            </p>
+            <p className="text-sm text-slate-500">{lang === 'hi' ? 'आज किस गाड़ी का काम है?' : 'Which bike are we fixing today?'}</p>
+          </div>
+        )}
+
         <SearchPanel query={query} onChange={setQuery} parts={parts} large />
 
-        {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
+        {error && <ErrorNote>We couldn't load your parts. Please check the internet and try again. ({error})</ErrorNote>}
         {loading && (
           <div className="space-y-3" aria-label="Loading parts">
             {[0, 1, 2].map((i) => (
@@ -148,8 +162,8 @@ export function MobileHome() {
         </ul>
         {!loading && searching && results.length === 0 && (
           <div className="rounded-2xl bg-white p-6 text-center text-slate-600">
-            <p className="font-semibold text-slate-800">No parts match.</p>
-            <p className="text-sm">Try fewer words, another spelling, or a different brand.</p>
+            <p className="font-semibold text-slate-800">Hmm, we couldn't find that.</p>
+            <p className="text-sm">Try fewer words, another spelling, or just the bike name.</p>
           </div>
         )}
       </main>

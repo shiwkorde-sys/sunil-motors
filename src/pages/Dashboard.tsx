@@ -12,6 +12,8 @@ import Billing from '../components/Billing';
 import Sales from '../components/Sales';
 import SettingsPanel from '../components/SettingsPanel';
 import AdminNav from '../components/AdminNav';
+import { FeedbackButton } from '../components/Feedback';
+import { ToastProvider, useToast } from '../lib/toast';
 import CategoryBars from '../components/CategoryBars';
 import RestockList from '../components/RestockList';
 import { emptyQuery, type Query } from '../lib/search';
@@ -44,6 +46,7 @@ export default function Dashboard() {
   return (
     <LazyMotion features={domMax} strict>
       <MotionConfig reducedMotion="user">
+        <ToastProvider>
         <div className="admin flex min-h-screen flex-col lg:flex-row">
           <aside className="sticky top-0 z-20 w-full shrink-0 border-b border-black/[0.06] bg-white/70 p-4 backdrop-blur-2xl lg:flex lg:h-screen lg:w-60 lg:flex-col lg:border-b-0 lg:border-r lg:p-5">
             <div className="mb-3 flex items-center gap-2.5 lg:mb-8">
@@ -55,8 +58,15 @@ export default function Dashboard() {
             </div>
             <AdminNav tabs={TABS} tab={tab} onPick={setTab} />
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/[0.06] pt-4 text-sm text-[#6e6e73] lg:mt-auto lg:block lg:space-y-2">
+              <FeedbackButton />
               <Link to="/m" className="block underline decoration-black/20 underline-offset-2 hover:text-[#0071e3]">Mechanic view</Link>
-              <div className="truncate text-xs">{profile?.email}</div>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0071e3]/10 text-xs font-semibold text-[#0071e3]">{(first || profile?.email || '?').slice(0, 1).toUpperCase()}</span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-[13px] font-medium text-[#1d1d1f]">{profile?.full_name || first}</span>
+                  <span className="block truncate text-[11px]">{profile?.email}</span>
+                </span>
+              </div>
               <button onClick={signOut} className="underline decoration-black/20 underline-offset-2 hover:text-[#0071e3]">Sign out</button>
             </div>
           </aside>
@@ -65,12 +75,13 @@ export default function Dashboard() {
             <header>
               <p className="text-[13px] font-medium text-[#86868b]">{first ? `${greeting()}, ${first} · ` : ''}{today}</p>
               <h1 className="mt-1 text-[2.125rem] font-bold leading-tight tracking-[-0.035em] text-[#1d1d1f]">{tab}</h1>
+              {tab === 'Overview' && !loading && <DailyNote parts={parts} />}
             </header>
-            {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
-            {loading && <p className="text-[#6e6e73]">Loading…</p>}
+            {error && <ErrorNote>We couldn't load your parts. Please check the internet and try again. ({error})</ErrorNote>}
+            {loading && <OverviewSkeleton />}
             <AnimatePresence mode="wait" initial={false}>
               <m.div key={tab} className="space-y-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
-              {tab === 'Overview' && <Overview parts={parts} onOpenPart={(p) => { setSeed({ vehicle: '', part: p.sku, any: '' }); setTab('Inventory'); }} />}
+              {!loading && tab === 'Overview' && <Overview parts={parts} onOpenPart={(p) => { setSeed({ vehicle: '', part: p.sku, any: '' }); setTab('Inventory'); }} />}
               {tab === 'Inventory' && <Inventory parts={parts} reload={reload} initialQuery={seed} />}
               {tab === 'Billing' && <Billing parts={parts} reload={reload} />}
               {tab === 'Settings' && <SettingsPanel />}
@@ -80,8 +91,36 @@ export default function Dashboard() {
             </AnimatePresence>
           </main>
         </div>
+        </ToastProvider>
       </MotionConfig>
     </LazyMotion>
+  );
+}
+
+/** Placeholder shapes while stock loads, so the page doesn't jump when it arrives. */
+function OverviewSkeleton() {
+  return (
+    <div aria-label="Loading your stock" className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="shimmer h-[148px] rounded-[20px] bg-[#e8e8ed]" />)}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="shimmer h-72 rounded-[20px] bg-[#e8e8ed]" />
+        <div className="shimmer h-72 rounded-[20px] bg-[#e8e8ed]" />
+      </div>
+    </div>
+  );
+}
+
+/** One plain sentence about how the shop looks right now. */
+function DailyNote({ parts }: { parts: Part[] }) {
+  const out = parts.filter((p) => stockState(p) === 'out').length;
+  const low = parts.filter((p) => stockState(p) === 'low').length;
+  const bits = [out && `${out} ${out === 1 ? 'part is' : 'parts are'} out of stock`, low && `${low} ${low === 1 ? 'is' : 'are'} running low`].filter(Boolean);
+  return (
+    <p className="mt-1.5 max-w-xl text-[15px] text-[#6e6e73]">
+      {parts.length === 0 ? "No parts yet. Add one, or use Bulk upload, and we'll get started." : bits.length ? `${bits.join(' and ')}. Worth a look before the next rush.` : 'Every part is well stocked. Nice work keeping the shelves full.'}
+    </p>
   );
 }
 
@@ -127,7 +166,7 @@ function Team() {
   const { profile: me } = useAuth();
   const [people, setPeople] = useState<Profile[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const toast = useToast();
   const load = () => supabase.from('profiles').select('*').order('created_at').then(({ data }) => setPeople((data as Profile[]) ?? []));
   useEffect(() => { void load(); }, []);
 
@@ -141,30 +180,29 @@ function Team() {
 
   async function remove() {
     if (!removing) return;
-    setBusy(true); setErr(null); setNote(null);
+    setBusy(true); setErr(null);
     const { error } = await supabase.rpc('delete_user', { p_user_id: removing.id });
     setBusy(false);
     if (error) setErr(error.message);
     else {
-      setNote(`${removing.full_name || removing.email} was removed. Their old sales and bills are still in your records.`);
+      toast.success(`${removing.full_name || removing.email} was removed. Their sales and bills are still in your records.`);
       void load();
     }
     setRemoving(null);
   }
 
   async function sendReset(p: Profile) {
-    setErr(null); setNote(null);
+    setErr(null);
     if (!p.email) return setErr('This person has no email on file.');
     const { error } = await supabase.auth.resetPasswordForEmail(p.email, { redirectTo: `${window.location.origin}/reset-password` });
     if (error) setErr(/rate limit/i.test(error.message) ? 'Too many emails were sent. Wait an hour and try again.' : error.message);
-    else setNote(`Reset link sent to ${p.email}. Ask them to check Inbox and Spam.`);
+    else toast.success(`Reset link sent to ${p.email}. Ask them to check Inbox and Spam.`);
   }
 
   return (
     <section className="max-w-2xl space-y-3">
       <p className="text-sm text-slate-500">Mechanics create their own account on the login page. Each person's name is used in the Sales list. Promote someone to admin, send a password reset link, or remove an account when someone leaves.</p>
       {err && <ErrorNote>{err}</ErrorNote>}
-      {note && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{note}</p>}
       <ul className="divide-y rounded-2xl bg-white shadow-sm">
         {people.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 p-4">

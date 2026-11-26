@@ -41,9 +41,15 @@ export default function StockKpis({ parts, compact = false, active, onPick, dela
             {on && <m.span layoutId="kpi-ring" transition={{ type: 'spring', stiffness: 520, damping: 40 }} className="pointer-events-none absolute inset-0 rounded-[20px] ring-2 ring-inset ring-[#0071e3]" />}
             <div className="flex items-start justify-between gap-2">
               <span className={`font-medium text-[#6e6e73] ${compact ? 'text-xs' : 'text-[13px]'}`}>{k.label}</span>
-              <span className={`flex shrink-0 items-center justify-center rounded-[9px] ${compact ? 'h-6 w-6' : 'h-8 w-8'}`} style={{ background: k.badge, color: k.accent }}>
+              {/* if something needs attention, its icon gives one small nudge when the page opens */}
+              <m.span
+                animate={k.value > 0 && (k.pick === 'low' || k.pick === 'out') ? { scale: [1, 1.22, 1, 1.12, 1] } : undefined}
+                transition={{ delay: 1.1, duration: 0.9, ease: 'easeInOut' }}
+                className={`flex shrink-0 items-center justify-center rounded-[9px] ${compact ? 'h-6 w-6' : 'h-8 w-8'}`}
+                style={{ background: k.badge, color: k.accent }}
+              >
                 <Icon className={compact ? 'h-3.5 w-3.5' : 'h-[18px] w-[18px]'} />
-              </span>
+              </m.span>
             </div>
             <div className={`num font-semibold leading-none text-[#1d1d1f] ${compact ? 'mt-2 text-3xl' : 'mt-4 text-[2.75rem]'}`}>
               <CountUp value={k.value} format={(n) => String(n)} />

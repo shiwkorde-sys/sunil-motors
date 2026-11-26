@@ -89,3 +89,7 @@ body {
 .admin tbody tr { transition: background-color 0.15s; }
 .admin tbody tr:hover { background-color: #f5f9ff; }
 .admin thead tr, .admin thead th { background-color: #fafafc; }
+
+@keyframes toastbar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.toast-bar { animation-name: toastbar; animation-timing-function: linear; animation-fill-mode: forwards; }
+@media (prefers-reduced-motion: reduce) { .toast-bar { animation: none; } }

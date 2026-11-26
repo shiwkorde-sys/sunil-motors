@@ -29,7 +29,7 @@ export default function CheckoutSheet({ part, onClose, onDone }: { part: Part; o
     setBusy(false);
     if (error) return setError(error.message);
     const left = part.quantity_available - qty;
-    onDone(`✓ ${qty} × ${part.name} checked out${reg.trim() ? ` for ${reg.trim().toUpperCase()}` : ''}. ${left} left on the shelf.`);
+    onDone(`Done. ${qty} × ${part.name} noted${reg.trim() ? ` for ${reg.trim().toUpperCase()}` : ''}. ${left} left on the shelf.`);
   }
 
   return (
