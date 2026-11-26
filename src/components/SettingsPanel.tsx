@@ -1,3 +1,5 @@
+import { useToast } from '../lib/toast';
+import { FeedbackInbox } from './Feedback';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { CompanySettings } from '../lib/types';
@@ -9,6 +11,7 @@ export default function SettingsPanel() {
   const [s, setS] = useState<CompanySettings | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -18,7 +21,7 @@ export default function SettingsPanel() {
     });
   }, []);
 
-  if (!s) return err ? <ErrorNote>{err}. Has the invoices update been applied to the database?</ErrorNote> : <p className="text-slate-500">Loading…</p>;
+  if (!s) return err ? <ErrorNote>{err}. Has the invoices update been applied to the database?</ErrorNote> : <p className="text-slate-500">Getting your settings…</p>;
   const set = <K extends keyof CompanySettings>(k: K, v: CompanySettings[K]) => {
     setS({ ...s, [k]: v });
     setSaved(false);
@@ -54,7 +57,10 @@ export default function SettingsPanel() {
       .eq('id', 1);
     setBusy(false);
     if (error) setErr(error.message);
-    else setSaved(true);
+    else {
+      setSaved(true);
+      toast.success('Settings saved.');
+    }
   }
 
   return (
@@ -117,8 +123,10 @@ export default function SettingsPanel() {
         <button onClick={save} disabled={busy} className="h-12 rounded-xl bg-brand px-8 font-bold text-white active:scale-95 disabled:opacity-60">
           {busy ? 'Saving…' : 'Save settings'}
         </button>
-        {saved && <span className="anim-pop font-semibold text-green-700">Saved ✓</span>}
+        {saved && <span className="anim-pop font-semibold text-green-700">All saved ✓</span>}
       </div>
+
+      <FeedbackInbox />
     </div>
   );
 }

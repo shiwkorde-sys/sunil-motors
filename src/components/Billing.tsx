@@ -1,3 +1,4 @@
+import { useToast } from '../lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { calcLine, inr, toInvoice, toItem } from '../lib/invoice';
 import { emptyQuery, searchParts } from '../lib/search';
@@ -41,6 +42,7 @@ export default function Billing({ parts, reload }: { parts: Part[]; reload: () =
 }
 
 function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => void; onCreated: (inv: Invoice, items: InvoiceItem[]) => void }) {
+  const toast = useToast();
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [cust, setCust] = useState({ name: '', phone: '', vehicle: '', gstin: '' });
   const [gst, setGst] = useState(false);
@@ -132,6 +134,7 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
     const inv = toInvoice(data as Record<string, unknown>);
     const { data: its } = await supabase.from('invoice_items').select('*').eq('invoice_id', inv.id).order('id');
     setBusy(false);
+    toast.success(`Bill ${inv.invoice_number} is ready.`);
     onCreated(inv, (its ?? []).map((r) => toItem(r)));
     setLines([]);
     setCust({ name: '', phone: '', vehicle: '', gstin: '' });
@@ -186,7 +189,7 @@ function NewBill({ parts, reload, onCreated }: { parts: Part[]; reload: () => vo
             </div>
             <input className={inputCls + ' mt-2'} placeholder="Search by vehicle number (works for any day you chose)" value={vehFilter} onChange={(e) => setVehFilter(e.target.value)} aria-label="Filter checkouts by vehicle" />
             <ul className="mt-2 max-h-72 space-y-1.5 overflow-auto">
-              {shownPending.length === 0 && <li className="py-2 text-sm text-slate-500">{when === 'today' ? 'No unbilled checkouts today. Pick another date or "All dates" to look further back.' : 'Nothing to bill for this choice.'}</li>}
+              {shownPending.length === 0 && <li className="py-2 text-sm text-slate-500">{when === 'today' ? 'All caught up. Nothing waiting to be billed today. Pick another date to look back.' : 'Nothing to bill here. All caught up.'}</li>}
               {shownPending.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 shadow-sm">
                   <span className="min-w-0 text-sm">
@@ -285,7 +288,7 @@ function History({ onOpen }: { onOpen: (inv: Invoice, items: InvoiceItem[]) => v
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500"><tr>{['Bill', 'Date', 'Customer', 'Vehicle', 'GST', 'Total', ''].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr></thead>
           <tbody className="divide-y">
-            {shown.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No bills yet.</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No bills yet. The first one you make will show up here.</td></tr>}
             {shown.map((r) => (
               <tr key={r.id}>
                 <td className="px-4 py-2 font-mono">{r.invoice_number}</td>

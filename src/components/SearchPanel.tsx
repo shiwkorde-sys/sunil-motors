@@ -76,7 +76,7 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
           value={query.vehicle}
           onChange={(v) => onChange({ ...query, vehicle: v, any: '' })}
           options={vehicleOptions}
-          placeholder="Vehicle: pick or type (Activa, Splendor…)"
+          placeholder="Which bike? Activa, Splendor…"
         />
         <Combobox
           label="Part name"
@@ -84,7 +84,7 @@ export default function SearchPanel({ query, onChange, parts, large = false }: P
           value={query.part}
           onChange={(v) => onChange({ ...query, part: v, any: '' })}
           options={partOptions}
-          placeholder="Part: pick or type (Brake, Clutch…)"
+          placeholder="Which part? Brake, Clutch…"
         />
       </div>
 

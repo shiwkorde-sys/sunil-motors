@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parseCsv, type ParsedImport } from '../lib/csv';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../lib/toast';
 import { ErrorNote } from './ui';
 
 /** Upload many parts at once from a CSV. Same SKU = update, new SKU = add. */
@@ -9,6 +10,7 @@ export default function BulkUpload({ reload, onDone }: { reload: () => void; onD
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   async function pick(file?: File) {
     setParsed(null);
@@ -36,6 +38,7 @@ export default function BulkUpload({ reload, onDone }: { reload: () => void; onD
     }
     setBusy(false);
     setStatus(`Done. ${parsed.rows.length} parts added or updated.`);
+    toast.success(`${parsed.rows.length} parts added or updated.`);
     setParsed(null);
     reload();
     onDone?.();

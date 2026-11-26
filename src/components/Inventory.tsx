@@ -7,6 +7,7 @@ import BulkUpload from './BulkUpload';
 import PartDetail from './PartDetail';
 import PartForm from './PartForm';
 import SearchPanel from './SearchPanel';
+import { useToast } from '../lib/toast';
 import StockKpis, { type StockPick } from './StockKpis';
 import { ErrorNote, Modal, StockBadge } from './ui';
 
@@ -65,11 +66,16 @@ export default function Inventory({ parts, reload, initialQuery }: { parts: Part
   const toggle = (k: string) => setClosed((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set(s).add(k)));
   const viewPart = parts.find((p) => p.id === viewing);
 
+  const toast = useToast();
+
   async function remove(p: Part) {
     if (!confirm(`Delete "${p.name}"? Parts with sales history cannot be deleted. Set the quantity to 0 instead.`)) return;
     const { error } = await supabase.from('parts').delete().eq('id', p.id);
     if (error) setErr(error.code === '23503' ? 'This part has sales history, so it cannot be deleted. Set its quantity to 0 instead.' : error.message);
-    else reload();
+    else {
+      toast.success(`Deleted "${p.name}".`);
+      reload();
+    }
   }
 
   const row = (p: Part) => (
@@ -123,7 +129,7 @@ export default function Inventory({ parts, reload, initialQuery }: { parts: Part
             <tr>{['SKU', 'Part', 'Compatible models', 'Shelf', 'Stock', ''].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
-            {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500"><div className="font-semibold text-slate-700">No parts match</div><div className="text-sm">Clear a filter or change the search.</div></td></tr>}
+            {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500"><div className="font-semibold text-slate-700">Hmm, nothing matches that</div><div className="text-sm">Try clearing a filter or changing the words.</div></td></tr>}
             {groups
               ? groups.map(([name, list]) => {
                   const open = !closed.has(name);
@@ -148,7 +154,7 @@ export default function Inventory({ parts, reload, initialQuery }: { parts: Part
         </table>
       </div>
 
-      {editing && <PartForm part={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} onSaved={reload} />}
+      {editing && <PartForm part={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} onSaved={() => { toast.success('Part saved.'); reload(); }} />}
       {uploading && (
         <Modal title="Bulk upload parts" onClose={() => setUploading(false)}>
           <BulkUpload reload={reload} />

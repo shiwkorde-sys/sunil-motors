@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { m } from 'framer-motion';
 import type { Part } from '../lib/types';
+import { CheckBadge } from './motion';
 import { StockBadge } from './ui';
 import { ChevronRight, CopyIcon } from './icons';
 
@@ -21,7 +22,14 @@ export default function RestockList({ parts, onOpen }: { parts: Part[]; onOpen: 
     }
   }
 
-  if (parts.length === 0) return <p className="py-6 text-center text-sm text-[#6e6e73]">Everything is stocked. Nothing to reorder right now.</p>;
+  if (parts.length === 0)
+    return (
+      <div className="flex flex-col items-center gap-2 py-8 text-center">
+        <CheckBadge className="h-12 w-12" />
+        <p className="text-sm font-semibold text-[#1d1d1f]">Shelves look good</p>
+        <p className="text-sm text-[#6e6e73]">Nothing to reorder today.</p>
+      </div>
+    );
 
   return (
     <ul className="-mx-2">

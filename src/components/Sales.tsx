@@ -175,7 +175,7 @@ export default function Sales({ parts }: { parts: Part[] }) {
       {/* ───── The list ───── */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-500" aria-live="polite">
-          {loading ? 'Loading sales…' : `${plural(shown.length, 'sale')} shown`}
+          {loading ? 'Fetching your sales…' : `${plural(shown.length, 'sale')} shown`}
           {rows.length >= 1000 && ' (latest 1,000. Choose fewer days to see the rest.)'}
           <span className="ml-2 text-slate-400">History is read-only.</span>
         </p>
@@ -198,8 +198,8 @@ export default function Sales({ parts }: { parts: Part[] }) {
           <tbody className="divide-y divide-slate-50">
             {empty && (
               <tr><td colSpan={8} className="px-4 py-14 text-center text-slate-500">
-                <div className="font-semibold text-slate-700">No sales here</div>
-                <div className="text-sm">Try another period, or clear the search.</div>
+                <div className="font-semibold text-slate-700">No sales in this period yet</div>
+                <div className="text-sm">Pick another date range, or clear the search.</div>
               </td></tr>
             )}
             {shown.map((r, i) => (

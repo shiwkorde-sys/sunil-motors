@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Part } from '../lib/types';
 import { stockState } from '../lib/search';
 import { isConfigured } from '../lib/supabase';
@@ -33,7 +34,10 @@ export function StockBadge({ part, big = false }: { part: Part; big?: boolean })
 }
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return (
+  // Drawn at the top of the page, so frosted or animated parents (sidebar, tab transition) can't squeeze it.
+  const themed = typeof document !== 'undefined' && document.querySelector('.admin') ? 'admin' : '';
+  return createPortal(
+    <div className={themed}>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
       <div
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-xl sm:rounded-2xl"
@@ -50,6 +54,8 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         {children}
       </div>
     </div>
+    </div>,
+    document.body,
   );
 }
 
