@@ -18,7 +18,7 @@ export default function SettingsPanel() {
     });
   }, []);
 
-  if (!s) return err ? <ErrorNote>{err}. Has the invoices update been applied to the database?</ErrorNote> : <p className="text-slate-500">Loading…</p>;
+  if (!s) return err ? <ErrorNote>{err}. Has the invoices update been applied to the database?</ErrorNote> : <p className="text-slate-500">Getting your settings…</p>;
   const set = <K extends keyof CompanySettings>(k: K, v: CompanySettings[K]) => {
     setS({ ...s, [k]: v });
     setSaved(false);
@@ -117,7 +117,7 @@ export default function SettingsPanel() {
         <button onClick={save} disabled={busy} className="h-12 rounded-xl bg-brand px-8 font-bold text-white active:scale-95 disabled:opacity-60">
           {busy ? 'Saving…' : 'Save settings'}
         </button>
-        {saved && <span className="anim-pop font-semibold text-green-700">Saved ✓</span>}
+        {saved && <span className="anim-pop font-semibold text-green-700">All saved ✓</span>}
       </div>
     </div>
   );

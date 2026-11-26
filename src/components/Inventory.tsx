@@ -123,7 +123,7 @@ export default function Inventory({ parts, reload, initialQuery }: { parts: Part
             <tr>{['SKU', 'Part', 'Compatible models', 'Shelf', 'Stock', ''].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y">
-            {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500"><div className="font-semibold text-slate-700">No parts match</div><div className="text-sm">Clear a filter or change the search.</div></td></tr>}
+            {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500"><div className="font-semibold text-slate-700">Hmm, nothing matches that</div><div className="text-sm">Try clearing a filter or changing the words.</div></td></tr>}
             {groups
               ? groups.map(([name, list]) => {
                   const open = !closed.has(name);

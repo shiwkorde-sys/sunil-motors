@@ -56,7 +56,13 @@ export default function Dashboard() {
             <AdminNav tabs={TABS} tab={tab} onPick={setTab} />
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/[0.06] pt-4 text-sm text-[#6e6e73] lg:mt-auto lg:block lg:space-y-2">
               <Link to="/m" className="block underline decoration-black/20 underline-offset-2 hover:text-[#0071e3]">Mechanic view</Link>
-              <div className="truncate text-xs">{profile?.email}</div>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0071e3]/10 text-xs font-semibold text-[#0071e3]">{(first || profile?.email || '?').slice(0, 1).toUpperCase()}</span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-[13px] font-medium text-[#1d1d1f]">{profile?.full_name || first}</span>
+                  <span className="block truncate text-[11px]">{profile?.email}</span>
+                </span>
+              </div>
               <button onClick={signOut} className="underline decoration-black/20 underline-offset-2 hover:text-[#0071e3]">Sign out</button>
             </div>
           </aside>
@@ -65,9 +71,10 @@ export default function Dashboard() {
             <header>
               <p className="text-[13px] font-medium text-[#86868b]">{first ? `${greeting()}, ${first} · ` : ''}{today}</p>
               <h1 className="mt-1 text-[2.125rem] font-bold leading-tight tracking-[-0.035em] text-[#1d1d1f]">{tab}</h1>
+              {tab === 'Overview' && !loading && <DailyNote parts={parts} />}
             </header>
-            {error && <ErrorNote>Could not load parts: {error}</ErrorNote>}
-            {loading && <p className="text-[#6e6e73]">Loading…</p>}
+            {error && <ErrorNote>We couldn't load your parts. Please check the internet and try again. ({error})</ErrorNote>}
+            {loading && <p className="text-[#6e6e73]">Fetching your stock…</p>}
             <AnimatePresence mode="wait" initial={false}>
               <m.div key={tab} className="space-y-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
               {tab === 'Overview' && <Overview parts={parts} onOpenPart={(p) => { setSeed({ vehicle: '', part: p.sku, any: '' }); setTab('Inventory'); }} />}
@@ -82,6 +89,18 @@ export default function Dashboard() {
         </div>
       </MotionConfig>
     </LazyMotion>
+  );
+}
+
+/** One plain sentence about how the shop looks right now. */
+function DailyNote({ parts }: { parts: Part[] }) {
+  const out = parts.filter((p) => stockState(p) === 'out').length;
+  const low = parts.filter((p) => stockState(p) === 'low').length;
+  const bits = [out && `${out} ${out === 1 ? 'part is' : 'parts are'} out of stock`, low && `${low} ${low === 1 ? 'is' : 'are'} running low`].filter(Boolean);
+  return (
+    <p className="mt-1.5 max-w-xl text-[15px] text-[#6e6e73]">
+      {parts.length === 0 ? "No parts yet. Add one, or use Bulk upload, and we'll get started." : bits.length ? `${bits.join(' and ')}. Worth a look before the next rush.` : 'Every part is well stocked. Nice work keeping the shelves full.'}
+    </p>
   );
 }
 

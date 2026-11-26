@@ -21,7 +21,7 @@ export default function RestockList({ parts, onOpen }: { parts: Part[]; onOpen: 
     }
   }
 
-  if (parts.length === 0) return <p className="py-6 text-center text-sm text-[#6e6e73]">Everything is stocked. Nothing to reorder right now.</p>;
+  if (parts.length === 0) return <p className="py-6 text-center text-sm text-[#6e6e73]">Shelves look good. Nothing to reorder today.</p>;
 
   return (
     <ul className="-mx-2">
